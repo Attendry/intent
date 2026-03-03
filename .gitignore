@@ -1,0 +1,33 @@
+# Override parent .cursor/.gitignore which ignores everything with *
+!*
+!**/*
+
+node_modules
+.next
+*.log
+
+# Build artifacts
+tsconfig.tsbuildinfo
+
+# Environment files
+.env
+.env.local
+.env*.local
+
+# Database
+prisma/dev.db
+prisma/dev.db-journal
+*.db
+*.db-journal
+
+# Uploads
+uploads/
+
+# Test artifacts
+playwright-report/
+test-results/
+coverage/
+
+# OS files
+.DS_Store
+Thumbs.db

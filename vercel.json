@@ -1,0 +1,24 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/cadence",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/events",
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/news",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/linkedin",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/rss",
+      "schedule": "0 10 * * *"
+    }
+  ]
+}

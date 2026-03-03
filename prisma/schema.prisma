@@ -1,0 +1,299 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                   String    @id @default(cuid())
+  email                String?   @unique
+  supabaseId           String    @unique
+  captureTokenHash     String?   @unique
+  captureTokenCreatedAt DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  prospects            Prospect[]
+  companies            Company[]
+  content              Content[]
+  settings             UserSettings[]
+  companyProfile       CompanyProfile?
+  voiceExamples        VoiceExample[]
+  prospectSuggestions  ProspectSuggestion[]
+}
+
+model UserSettings {
+  id    String   @id @default(cuid())
+  userId String  @unique
+  data  String   // JSON blob for all settings
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Prospect {
+  id             String    @id @default(cuid())
+  userId         String
+  firstName      String
+  lastName       String
+  email          String?
+  phone          String?
+  mobilePhone    String?
+  title          String?
+  company        String?
+  companyId      String?
+  industry       String?
+  linkedinUrl    String?
+  personaSummary String?
+  personaTags    String?   // JSON array stored as string
+  roleArchetype  String?   // finance, technology, legal, operations, executive, general
+  backgroundNotes String?
+  zoomInfoRaw    String?   // raw JSON from CSV import
+  priorityTier   String    @default("medium") // low, medium, high
+  starred        Boolean   @default(false)
+  preferredLang  String    @default("en") // en or de
+  lastContactedAt DateTime?
+  nextFollowUpAt  DateTime?
+  pipelineStage  String?   // meeting_booked, qualified, proposal, etc.
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyRef    Company?         @relation(fields: [companyId], references: [id])
+  signals       Signal[]
+  outreach      OutreachLog[]
+  savedFindings SavedFinding[]
+
+  @@unique([userId, email])
+  @@index([userId])
+  @@index([company])
+  @@index([companyId])
+  @@index([starred])
+  @@index([nextFollowUpAt])
+}
+
+model Signal {
+  id           String   @id @default(cuid())
+  prospectId   String
+  type         String   // linkedin_post, company_news, job_change, hiring, conference, re_engagement, new_prospect, other
+  sourceUrl    String?
+  rawContent   String?
+  summary      String?
+  urgencyScore Int      @default(3) // 1-5
+  outreachAngle String?
+  contentSuggestionIds String? // JSON array of content IDs
+  private      Boolean  @default(false)
+  actedOn      Boolean  @default(false)
+  snoozedUntil DateTime?
+  dismissed    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  prospect Prospect @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+
+  @@index([prospectId])
+  @@index([actedOn])
+  @@index([createdAt])
+  @@index([type])
+  @@index([snoozedUntil])
+}
+
+model OutreachLog {
+  id           String   @id @default(cuid())
+  prospectId   String
+  channel      String   // email, linkedin, phone, other
+  messageSent  String?
+  subjectLine  String?
+  outcome      String   @default("no_response") // no_response, positive, negative, meeting_booked
+  notes        String?
+  language     String   @default("en")
+  contentIds   String?  // JSON array of content IDs used in this outreach
+  nextFollowUpAt DateTime?
+  createdAt    DateTime @default(now())
+
+  prospect Prospect @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+
+  @@index([prospectId])
+  @@index([createdAt])
+}
+
+model Content {
+  id           String   @id @default(cuid())
+  userId       String
+  title        String
+  type         String   // case_study, blog, whitepaper, video, competitive, other
+  stage        String?  // intro, nurture, closing - best for which stage
+  url          String?
+  body         String?
+  summary      String?
+  tags         String?  // JSON array
+  personaFit   String?  // JSON array of persona tags this content fits
+  useCaseFit   String?  // JSON array of use cases
+  timesUsed    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([type])
+}
+
+model VoiceExample {
+  id           String   @id @default(cuid())
+  userId       String
+  language     String   @default("en")
+  originalDraft String
+  revisedDraft  String
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model ProspectSuggestion {
+  id          String   @id @default(cuid())
+  userId      String
+  firstName   String
+  lastName   String
+  title       String?
+  company     String?
+  linkedinUrl String?
+  source      String
+  signalType  String   @default("conference")
+  reason      String
+  status      String   @default("pending") // pending, approved, dismissed
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+}
+
+model Company {
+  id                   String    @id @default(cuid())
+  userId               String
+  name                 String
+  industry             String?
+  website              String?
+  size                 String?
+  hqLocation           String?
+  notes                String?
+  battlecard           String?
+  roleBriefingCache    String?   // JSON: { "finance": "...", "technology": "...", ... }
+  lastSynthesizedAt    DateTime?
+  synthStatus          String    @default("none") // none, pending, completed, failed
+  synthError           String?
+  intelCountSinceSynth Int       @default(0)
+  fitScore             Int?      // 0-100 overall weighted score
+  fitAnalysis          String?   // JSON: full structured fit analysis
+  fitBucket            String?   // quick_win, strategic_bet, nurture, park
+  profileVersionUsed   String?   // which profileVersionHash was used for this analysis
+  lastFitAnalyzedAt    DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  prospects Prospect[]
+  intel     CompanyIntel[]
+  documents CompanyDocument[]
+  savedFindings SavedFinding[]
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@index([name])
+  @@index([fitBucket])
+}
+
+model CompanyProfile {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  name                String?
+  website             String?
+  rawWebsiteText      String?
+  valueProposition    String?
+  offerings           String?  // JSON: structured offering objects
+  icp                 String?  // JSON: ideal customer profile dimensions
+  competitors         String?  // JSON: competitor profiles with win/loss
+  targetIndustries    String?  // JSON array
+  targetPersonas      String?  // JSON array
+  differentiators     String?  // JSON array
+  painPointsSolved    String?  // JSON array
+  fullProfile         String?  // AI-generated comprehensive narrative
+  status              String   @default("draft") // draft, published
+  contentVersionHash  String?  // snapshot of content state at last analysis
+  profileVersionHash  String?  // incremented on each publish, used to detect fit staleness
+  lastAnalyzedAt      DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model CompanyIntel {
+  id            String    @id @default(cuid())
+  companyId     String
+  documentId    String?
+  type          String    // company_news, conference, funding, partnership, hiring, leadership_change, earnings, strategy, risk, competitor, other
+  summary       String
+  sourceRef     String?
+  sourceQuote   String?
+  sourceUrl     String?
+  date          DateTime?
+  urgencyScore  Int       @default(3)
+  actionContext String?
+  createdAt     DateTime  @default(now())
+
+  company  Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  document CompanyDocument? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([documentId])
+  @@index([createdAt])
+}
+
+model SavedFinding {
+  id          String   @id @default(cuid())
+  content     String   // The finding text
+  source      String   @default("chat") // chat, etc.
+  prospectId  String?
+  companyId   String?
+  createdAt   DateTime @default(now())
+
+  prospect Prospect? @relation(fields: [prospectId], references: [id], onDelete: SetNull)
+  company  Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  @@index([prospectId])
+  @@index([companyId])
+  @@index([createdAt])
+}
+
+model CompanyDocument {
+  id              String    @id @default(cuid())
+  companyId       String
+  title           String
+  type            String    // annual_report, earnings, press_release, filing, other
+  sourceUrl       String?
+  filePath        String?
+  fullSummary     String?
+  rawText         String?
+  status          String    @default("pending") // pending, processing, completed, failed
+  processingStage String?   // downloading, parsing, extracting, saving
+  processingPct   Int       @default(0) // 0-100
+  processingError String?
+  processedAt     DateTime?
+  createdAt       DateTime  @default(now())
+
+  company Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  intel   CompanyIntel[]
+
+  @@index([companyId])
+  @@index([status])
+}
