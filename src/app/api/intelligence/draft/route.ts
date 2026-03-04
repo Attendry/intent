@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { generateDraft, getSettingsForUser } from "@/lib/ai";
 import { requireAuth } from "@/lib/auth";
-import type { Signal } from "@prisma/client";
+import type { Signal } from "@/generated/prisma/client";
 import { draftSchema, parseRequestBody } from "@/lib/validation";
 
 async function getCompanyContext(prospect: { companyId: string | null; roleArchetype: string | null; id: string }, userId: string) {

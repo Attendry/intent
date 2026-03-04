@@ -1,6 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { prisma } from "@/lib/db";
-import type { Prospect, Signal, Content } from "@prisma/client";
+import type { Prospect, Signal, Content } from "@/generated/prisma/client";
 
 const cachedClients = new Map<string, GoogleGenAI>();
 

@@ -1,4 +1,4 @@
-import type { Prospect, Signal } from "@prisma/client";
+import type { Prospect, Signal } from "@/generated/prisma/client";
 
 const WEIGHT_URGENCY = 0.4;
 const WEIGHT_FRESHNESS = 0.25;

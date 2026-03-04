@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/db";
 import crypto from "crypto";
-import type { User as PrismaUser } from "@prisma/client";
+import type { User as PrismaUser } from "@/generated/prisma/client";
 
 function hashCaptureToken(token: string): string {
   return crypto.createHash("sha256").update(token).digest("hex");

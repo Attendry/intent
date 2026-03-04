@@ -27,6 +27,27 @@ GEMINI_API_KEY="your-gemini-api-key"
 CRON_SECRET="random-secret-for-cron-endpoints"
 ```
 
+## 1b. P1000 Authentication Failed — Password Encoding
+
+If you get `P1000: Authentication failed` even with the correct password, **URL-encode special characters** in the password:
+
+| Character | Encoded |
+|-----------|---------|
+| `!` | `%21` |
+| `@` | `%40` |
+| `#` | `%23` |
+| `$` | `%24` |
+| `%` | `%25` |
+| `&` | `%26` |
+| `+` | `%2B` |
+| `=` | `%3D` |
+| `[` | `%5B` |
+| `]` | `%5D` |
+
+Example: password `Th1s1smy1nt3nt!` → use `Th1s1smy1nt3nt%21` in the URL.
+
+Also ensure the connection string ends with `?pgbouncer=true` for the pooler.
+
 ## 2. Run Database Migration
 
 ```bash

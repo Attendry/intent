@@ -9,6 +9,9 @@ node_modules
 # Build artifacts
 tsconfig.tsbuildinfo
 
+# Prisma 7 generated client (regenerated on postinstall)
+src/generated/
+
 # Environment files
 .env
 .env.local

@@ -1,4 +1,4 @@
-import type { Prospect, Signal } from "@prisma/client";
+import type { Prospect, Signal } from "@/generated/prisma/client";
 import { addDays, isPast } from "date-fns";
 
 export interface CadenceSettings {
