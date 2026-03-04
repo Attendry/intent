@@ -775,7 +775,16 @@ export default function CompanyDetailPage() {
                           <Loader2 className="h-3 w-3 animate-spin" />
                           {stageLabel}
                         </span>
-                        <span className="text-xs text-muted-foreground font-medium">{pct}%</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground font-medium">{pct}%</span>
+                          <button
+                            className="text-xs text-red-500 hover:text-red-600 transition-colors flex items-center gap-1"
+                            onClick={() => setConfirmDeleteDocId(doc.id)}
+                            title="Cancel and remove this document"
+                          >
+                            <Trash2 className="h-3 w-3" /> Cancel
+                          </button>
+                        </div>
                       </div>
                       <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
                         <div
