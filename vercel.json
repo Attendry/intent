@@ -1,6 +1,8 @@
 {
   "framework": "nextjs",
+  "installCommand": "npm install",
   "buildCommand": "prisma generate && prisma migrate deploy && next build",
+  "ignoreCommand": "exit 1",
   "build": {
     "env": {
       "NODE_OPTIONS": "--max-old-space-size=6144"
