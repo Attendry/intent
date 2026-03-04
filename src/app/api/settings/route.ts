@@ -24,11 +24,17 @@ export async function GET() {
       where: { userId: auth.user.id },
     });
 
-    if (!row) {
-      return NextResponse.json({});
-    }
-
-    return NextResponse.json(maskKeys(JSON.parse(row.data)));
+    const data = row ? (maskKeys(JSON.parse(row.data)) as Record<string, unknown>) : {};
+    // Indicate which keys are configured via env (so UI can hide those fields)
+    return NextResponse.json({
+      ...data,
+      apiKeysConfiguredViaEnv: {
+        geminiApiKey: !!process.env.GEMINI_API_KEY,
+        rapidApiKey: !!process.env.RAPID_API_KEY,
+        gnewsApiKey: !!process.env.GNEWS_API_KEY,
+        predictHqApiKey: !!process.env.PREDICTHQ_API_KEY,
+      },
+    });
   } catch (error) {
     console.error("GET /api/settings error:", error);
     return NextResponse.json(

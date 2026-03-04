@@ -62,8 +62,8 @@ export async function GET(request: Request) {
         where: { userId: user.id },
       });
       const settings = settingsRow ? JSON.parse(settingsRow.data) : {};
-      const gnewsKey = settings.gnewsApiKey;
-      const hasGemini = !!(settings.geminiApiKey || process.env.GEMINI_API_KEY);
+      const gnewsKey = process.env.GNEWS_API_KEY || settings.gnewsApiKey;
+      const hasGemini = !!(process.env.GEMINI_API_KEY || settings.geminiApiKey);
 
       if (!gnewsKey) continue;
 

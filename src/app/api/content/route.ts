@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     let useCaseFit = body.useCaseFit ? JSON.stringify(body.useCaseFit) : null;
 
     const settings = await getSettingsForUser(userId);
-    const hasApiKey = settings.geminiApiKey || process.env.GEMINI_API_KEY;
+    const hasApiKey = process.env.GEMINI_API_KEY || settings.geminiApiKey;
 
     if (hasApiKey && !tags) {
       try {

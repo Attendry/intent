@@ -28,7 +28,7 @@ export async function GET(request: Request) {
         where: { userId: user.id },
       });
       const settings = settingsRow ? JSON.parse(settingsRow.data) : {};
-      const apiKey = settings.rapidApiKey;
+      const apiKey = process.env.RAPID_API_KEY || settings.rapidApiKey;
 
       if (!apiKey) continue;
 

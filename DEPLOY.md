@@ -11,7 +11,10 @@ Set these for **Production** (and Preview if using a separate DB):
 | `DATABASE_URL` | Yes | Supabase PostgreSQL connection string (Transaction pooler) |
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anon/public key |
-| `GEMINI_API_KEY` | Yes | For AI features |
+| `GEMINI_API_KEY` | Yes | For AI features. Redeploy after adding. |
+| `RAPID_API_KEY` | Optional | RapidAPI (LinkedIn). Or set in Settings. |
+| `GNEWS_API_KEY` | Optional | GNews. Or set in Settings. |
+| `PREDICTHQ_API_KEY` | Optional | PredictHQ (Events). Or set in Settings. |
 | `CRON_SECRET` | Yes | Min 16 chars; secures `/api/cron/*` endpoints |
 | `NEXT_PUBLIC_BASE_URL` | Optional | Your Vercel URL (e.g. `https://your-app.vercel.app`) |
 

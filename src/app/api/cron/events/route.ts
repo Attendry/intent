@@ -28,7 +28,7 @@ export async function GET(request: Request) {
         where: { userId: user.id },
       });
       const settings = settingsRow ? JSON.parse(settingsRow.data) : {};
-      const apiKey = settings.predictHqApiKey;
+      const apiKey = process.env.PREDICTHQ_API_KEY || settings.predictHqApiKey;
 
       if (!apiKey) continue;
 

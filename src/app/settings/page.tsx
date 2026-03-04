@@ -32,11 +32,19 @@ import {
   ChevronRight,
 } from "lucide-react";
 
+interface ApiKeysConfiguredViaEnv {
+  geminiApiKey?: boolean;
+  rapidApiKey?: boolean;
+  gnewsApiKey?: boolean;
+  predictHqApiKey?: boolean;
+}
+
 interface SettingsData {
   geminiApiKey?: string;
   rapidApiKey?: string;
   gnewsApiKey?: string;
   predictHqApiKey?: string;
+  apiKeysConfiguredViaEnv?: ApiKeysConfiguredViaEnv;
   defaultFollowUpDays?: number;
   coldFollowUpDays?: number;
   reEngagementDays?: number;
@@ -209,6 +217,24 @@ export default function SettingsPage() {
             </CardTitle>
             <CardDescription>
               Connect external services for enrichment and AI features.
+              {settings.apiKeysConfiguredViaEnv &&
+                Object.values(settings.apiKeysConfiguredViaEnv).some(Boolean) && (
+                  <span className="mt-2 block text-green-600 dark:text-green-400">
+                    {Object.entries(settings.apiKeysConfiguredViaEnv)
+                      .filter(([, v]) => v)
+                      .map(([k]) =>
+                        k === "geminiApiKey"
+                          ? "Gemini"
+                          : k === "rapidApiKey"
+                            ? "RapidAPI"
+                            : k === "gnewsApiKey"
+                              ? "GNews"
+                              : "PredictHQ"
+                      )
+                      .join(", ")}{" "}
+                    configured via environment variables (more secure).
+                  </span>
+                )}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-5">
@@ -219,7 +245,12 @@ export default function SettingsPage() {
                 { key: "gnewsApiKey" as const, label: "GNews" },
                 { key: "predictHqApiKey" as const, label: "PredictHQ (Events)" },
               ] as const
-            ).map(({ key, label }) => (
+            )
+              .filter(
+                ({ key }) =>
+                  !settings.apiKeysConfiguredViaEnv?.[key]
+              )
+              .map(({ key, label }) => (
               <div key={key}>
                 <label className="mb-1.5 block text-sm font-semibold text-foreground">
                   {label} API Key

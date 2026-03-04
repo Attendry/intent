@@ -28,8 +28,9 @@ export async function getAIClient(userId: string): Promise<GoogleGenAI> {
   const cached = cachedClients.get(userId);
   if (cached) return cached;
   const settings = await getSettingsForUser(userId);
-  const apiKey = settings.geminiApiKey || process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("Gemini API key not configured. Set it in Settings.");
+  // Prefer env var (Vercel) over user-stored key for security
+  const apiKey = process.env.GEMINI_API_KEY || settings.geminiApiKey;
+  if (!apiKey) throw new Error("Gemini API key not configured. Set GEMINI_API_KEY in Vercel or in Settings.");
   const client = new GoogleGenAI({ apiKey });
   cachedClients.set(userId, client);
   return client;
