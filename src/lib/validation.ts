@@ -130,11 +130,11 @@ export const createProspectSchema = z.object({
 });
 
 export const documentUrlSchema = z.object({
-  url: z.string().url().optional(),
+  url: z.union([z.string().url(), z.literal("")]).optional(),
   storagePath: z.string().min(1).optional(),
   title: z.string().optional(),
   type: z.string().optional(),
-}).refine((d) => d.url || d.storagePath, {
+}).refine((d) => (d.url && d.url.length > 0) || (d.storagePath && d.storagePath.length > 0), {
   message: "url or storagePath is required",
 });
 

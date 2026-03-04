@@ -93,17 +93,24 @@ export async function POST(
       });
 
       const baseUrl = request.nextUrl.origin;
+      const cookie = request.headers.get("cookie") || "";
       fetch(`${baseUrl}/api/companies/${id}/documents/process`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          cookie,
+        },
         body: JSON.stringify({ documentId: doc.id }),
-      }).catch(() => {});
+      }).catch((err) => console.error("[documents] Process trigger failed:", err));
 
       return NextResponse.json(doc, { status: 201 });
     }
 
     const parsed = await parseRequestBody(request, documentUrlSchema);
-    if ("error" in parsed) return parsed.error;
+    if ("error" in parsed) {
+      console.error("[documents] Validation failed, status 400");
+      return parsed.error;
+    }
     const body = parsed.data;
 
     let sourceUrl: string;
@@ -136,11 +143,15 @@ export async function POST(
     });
 
     const baseUrl = request.nextUrl.origin;
+    const cookie = request.headers.get("cookie") || "";
     fetch(`${baseUrl}/api/companies/${id}/documents/process`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        cookie,
+      },
       body: JSON.stringify({ documentId: doc.id }),
-    }).catch(() => {});
+    }).catch((err) => console.error("[documents] Process trigger failed:", err));
 
     return NextResponse.json(doc, { status: 201 });
   } catch (error) {

@@ -4,6 +4,8 @@ import { documentProcessSchema, parseRequestBody } from "@/lib/validation";
 import { extractDocumentIntel } from "@/lib/ai";
 import { readFile } from "fs/promises";
 
+export const maxDuration = 120;
+
 async function updateProgress(
   docId: string,
   stage: string,
@@ -47,7 +49,10 @@ export async function POST(
 
   try {
     const parsed = await parseRequestBody(request, documentProcessSchema);
-    if ("error" in parsed) return parsed.error;
+    if ("error" in parsed) {
+      console.error("[doc-process] Validation failed");
+      return parsed.error;
+    }
     const { documentId } = parsed.data;
 
     const doc = await prisma.companyDocument.findUnique({

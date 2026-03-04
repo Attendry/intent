@@ -256,7 +256,10 @@ export default function CompanyDetailPage() {
       });
       const createData = await createRes.json();
       if (!createRes.ok) {
-        throw new Error(createData.error || "Failed to create document record");
+        const detail = createData.details
+          ? ` ${JSON.stringify(createData.details)}`
+          : "";
+        throw new Error((createData.error || "Failed to create document record") + detail);
       }
       fetchCompany();
       toast("Document uploaded. Processing started.", "success");
