@@ -39,6 +39,7 @@ interface DocumentMeta {
   title: string;
   type: string;
   sourceUrl: string | null;
+  viewUrl?: string | null;
   status: string;
   fullSummary: string | null;
 }
@@ -109,8 +110,6 @@ export default function DocumentViewerPage() {
 
   const [activeIntelId, setActiveIntelId] = useState<string | null>(null);
 
-  const pdfUrl = `/api/companies/${companyId}/documents/serve?docId=${docId}`;
-
   // Fetch document and intel data
   const fetchData = useCallback(async () => {
     try {
@@ -141,15 +140,19 @@ export default function DocumentViewerPage() {
     fetchData();
   }, [fetchData]);
 
-  // Load PDF document
+  // Load PDF document (wait for doc so we use correct viewUrl for Storage vs serve API)
   useEffect(() => {
+    if (!doc && !loading) return; // No doc and fetch done = doc not found
+    const url = doc?.viewUrl || `/api/companies/${companyId}/documents/serve?docId=${docId}`;
+    if (!url) return;
+
     let cancelled = false;
 
     async function loadPdf() {
       const pdfjsLib = await import("pdfjs-dist");
       pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
-      const loadingTask = pdfjsLib.getDocument(pdfUrl);
+      const loadingTask = pdfjsLib.getDocument(url);
       const pdf = await loadingTask.promise;
 
       if (cancelled) return;
@@ -166,7 +169,7 @@ export default function DocumentViewerPage() {
     return () => {
       cancelled = true;
     };
-  }, [pdfUrl, pageQuery]);
+  }, [doc, loading, companyId, docId, pageQuery]);
 
   // Render the current page (canvas + text layer)
   useEffect(() => {
