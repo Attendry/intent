@@ -219,14 +219,14 @@ export default function MyCompanyPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...editData, publish: true }),
       });
-      if (!res.ok) throw new Error("Failed to save");
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to publish");
       setProfile(data.profile);
       setEditing(false);
       toast("Profile published! Fit analysis can now use this profile.", "success");
       fetchProfile();
-    } catch {
-      toast("Failed to publish profile", "error");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to publish profile", "error");
     } finally {
       setSaving(false);
     }
@@ -240,12 +240,12 @@ export default function MyCompanyPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editData),
       });
-      if (!res.ok) throw new Error("Failed to save");
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to save");
       setProfile(data.profile);
       toast("Draft saved", "success");
-    } catch {
-      toast("Failed to save draft", "error");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to save draft", "error");
     } finally {
       setSaving(false);
     }

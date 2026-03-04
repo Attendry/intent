@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { extractCompanyProfile } from "@/lib/ai";
+import { extractCompanyProfile, isGeminiConfigured, GEMINI_NOT_CONFIGURED_MSG } from "@/lib/ai";
 import { requireAuth } from "@/lib/auth";
 import crypto from "crypto";
+
+// Website fetch + Gemini analysis can exceed default 10–15s; allow up to 60s
+export const maxDuration = 60;
 
 function computeContentHash(
   items: { id: string; updatedAt: Date }[]
@@ -14,8 +17,30 @@ function computeContentHash(
   return crypto.createHash("md5").update(payload).digest("hex");
 }
 
+function normalizeWebsiteUrl(input: string): string {
+  const trimmed = input.trim();
+  if (!trimmed) return trimmed;
+  try {
+    const url = new URL(trimmed);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      throw new Error("URL must use http or https");
+    }
+    return url.toString();
+  } catch {
+    // If no protocol, assume https
+    if (!/^https?:\/\//i.test(trimmed)) {
+      return `https://${trimmed}`;
+    }
+    throw new Error("Invalid website URL");
+  }
+}
+
 async function fetchAndParseWebsite(url: string): Promise<string> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 25_000);
+
   const response = await fetch(url, {
+    signal: controller.signal,
     headers: {
       "User-Agent":
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -23,6 +48,8 @@ async function fetchAndParseWebsite(url: string): Promise<string> {
     },
     redirect: "follow",
   });
+
+  clearTimeout(timeoutId);
 
   if (!response.ok) {
     throw new Error(`Failed to fetch website: HTTP ${response.status}`);
@@ -91,21 +118,42 @@ export async function PUT(request: NextRequest) {
     if ("error" in auth) return auth.error;
     const userId = auth.user.id;
 
-    const body = await request.json();
+    let body: { website?: string };
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid JSON body" },
+        { status: 400 }
+      );
+    }
     const { website } = body;
 
-    if (!website) {
+    if (!website || typeof website !== "string") {
       return NextResponse.json(
         { error: "website URL is required" },
         { status: 400 }
       );
     }
 
+    let normalizedUrl: string;
+    try {
+      normalizedUrl = normalizeWebsiteUrl(website);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Invalid website URL";
+      return NextResponse.json({ error: msg }, { status: 400 });
+    }
+
     let rawWebsiteText: string;
     try {
-      rawWebsiteText = await fetchAndParseWebsite(website);
+      rawWebsiteText = await fetchAndParseWebsite(normalizedUrl);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to fetch website";
+      const msg =
+        err instanceof Error
+          ? err.name === "AbortError"
+            ? "Website request timed out (25s)"
+            : err.message
+          : "Failed to fetch website";
       return NextResponse.json({ error: msg }, { status: 400 });
     }
 
@@ -113,6 +161,13 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json(
         { error: "Website text too short to analyze" },
         { status: 400 }
+      );
+    }
+
+    if (!(await isGeminiConfigured(userId))) {
+      return NextResponse.json(
+        { error: GEMINI_NOT_CONFIGURED_MSG },
+        { status: 503 }
       );
     }
 
@@ -146,7 +201,7 @@ export async function PUT(request: NextRequest) {
       create: {
         userId,
         name: result.name,
-        website,
+        website: normalizedUrl,
         rawWebsiteText,
         valueProposition: result.valueProposition,
         offerings: JSON.stringify(result.offerings),
@@ -163,7 +218,7 @@ export async function PUT(request: NextRequest) {
       },
       update: {
         name: result.name,
-        website,
+        website: normalizedUrl,
         rawWebsiteText,
         valueProposition: result.valueProposition,
         offerings: JSON.stringify(result.offerings),
@@ -183,9 +238,11 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ profile });
   } catch (error) {
     console.error("PUT /api/company-profile error:", error);
+    const msg = error instanceof Error ? error.message : "";
+    const isGeminiError = msg.includes("Gemini") || msg.includes("API key");
     return NextResponse.json(
-      { error: "Failed to generate company profile" },
-      { status: 500 }
+      { error: isGeminiError ? msg : "Failed to generate company profile" },
+      { status: isGeminiError ? 503 : 500 }
     );
   }
 }
@@ -196,7 +253,15 @@ export async function PATCH(request: NextRequest) {
     if ("error" in auth) return auth.error;
     const userId = auth.user.id;
 
-    const body = await request.json();
+    let body: Record<string, unknown>;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid JSON body" },
+        { status: 400 }
+      );
+    }
     const { publish, ...fields } = body;
 
     const existing = await prisma.companyProfile.findUnique({
@@ -251,8 +316,9 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ profile });
   } catch (error) {
     console.error("PATCH /api/company-profile error:", error);
+    const msg = error instanceof Error ? error.message : "";
     return NextResponse.json(
-      { error: "Failed to update company profile" },
+      { error: msg || "Failed to update company profile" },
       { status: 500 }
     );
   }

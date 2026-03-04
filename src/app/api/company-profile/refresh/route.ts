@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { extractCompanyProfile } from "@/lib/ai";
+import { extractCompanyProfile, isGeminiConfigured, GEMINI_NOT_CONFIGURED_MSG } from "@/lib/ai";
 import { requireAuth } from "@/lib/auth";
 import crypto from "crypto";
+
+export const maxDuration = 60;
 
 function computeContentHash(
   items: { id: string; updatedAt: Date }[]
@@ -35,6 +37,13 @@ export async function POST() {
       return NextResponse.json(
         { error: "No cached website text. Re-create the profile with a URL." },
         { status: 400 }
+      );
+    }
+
+    if (!(await isGeminiConfigured(userId))) {
+      return NextResponse.json(
+        { error: GEMINI_NOT_CONFIGURED_MSG },
+        { status: 503 }
       );
     }
 
@@ -85,9 +94,11 @@ export async function POST() {
     return NextResponse.json({ profile });
   } catch (error) {
     console.error("POST /api/company-profile/refresh error:", error);
+    const msg = error instanceof Error ? error.message : "";
+    const isGeminiError = msg.includes("Gemini") || msg.includes("API key");
     return NextResponse.json(
-      { error: "Failed to refresh company profile" },
-      { status: 500 }
+      { error: isGeminiError ? msg : "Failed to refresh company profile" },
+      { status: isGeminiError ? 503 : 500 }
     );
   }
 }

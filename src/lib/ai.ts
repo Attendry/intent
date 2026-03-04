@@ -24,13 +24,22 @@ export async function getSettingsForUser(userId: string): Promise<SettingsData> 
   return JSON.parse(row.data) as SettingsData;
 }
 
+export const GEMINI_NOT_CONFIGURED_MSG =
+  "Gemini API key not configured. Set GEMINI_API_KEY in Vercel or add your key in Settings → API Keys.";
+
+export async function isGeminiConfigured(userId: string): Promise<boolean> {
+  if (process.env.GEMINI_API_KEY) return true;
+  const settings = await getSettingsForUser(userId);
+  return !!settings.geminiApiKey;
+}
+
 export async function getAIClient(userId: string): Promise<GoogleGenAI> {
   const cached = cachedClients.get(userId);
   if (cached) return cached;
   const settings = await getSettingsForUser(userId);
   // Prefer env var (Vercel) over user-stored key for security
   const apiKey = process.env.GEMINI_API_KEY || settings.geminiApiKey;
-  if (!apiKey) throw new Error("Gemini API key not configured. Set GEMINI_API_KEY in Vercel or in Settings.");
+  if (!apiKey) throw new Error(GEMINI_NOT_CONFIGURED_MSG);
   const client = new GoogleGenAI({ apiKey });
   cachedClients.set(userId, client);
   return client;
