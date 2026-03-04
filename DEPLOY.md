@@ -55,3 +55,34 @@ git push origin main
 ```
 
 Connect the repo to Vercel, add env vars, then deploy. Cron jobs will run on the schedules in `vercel.json` once `CRON_SECRET` is set.
+
+## 6. Troubleshooting: Empty Build / Build Completes in ~150ms
+
+If the build completes in ~150ms with "no files prepared", the install and build steps are being skipped.
+
+**Check Vercel Project Settings → Build & Development Settings:**
+
+1. **Build Command**
+   - If "Override" is enabled and the field is **empty**, the build is skipped. Set it to: `npm run build` or `sh scripts/vercel-build.sh`
+   - Or disable Override to use `vercel.json`'s `buildCommand`
+
+2. **Install Command**
+   - Ensure it's not empty. Set to `npm install` or disable Override to use `vercel.json`
+
+3. **Framework Preset**
+   - Should be **Next.js**
+
+4. **Root Directory**
+   - Leave **empty** (repo root)
+
+5. **Skip deployment when there are no changes**
+   - If present under Root Directory, set to **Disabled**
+
+**Alternative: Deploy via CLI**
+
+```bash
+npx vercel link          # Link to your Vercel project (first time)
+npx vercel deploy --prod # Deploy with full build
+```
+
+CLI deployments may use a different code path and can work when Git deployments fail.
