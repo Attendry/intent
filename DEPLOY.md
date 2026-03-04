@@ -23,7 +23,7 @@ Set these for **Production** (and Preview if using a separate DB):
 
 - **Auth → URL Configuration**: Add your Vercel URL and `https://your-app.vercel.app/auth/callback` to Redirect URLs
 - **Database**: Run `npx prisma migrate deploy` once (or let `vercel-build` do it on first deploy)
-- **Storage**: Create a bucket named `company-documents` (Storage → New bucket). Set it to **Public** so uploaded PDFs can be viewed. Document uploads (annual reports) require this.
+- **Storage**: Create a bucket named `company-documents` (Storage → New bucket). Set it to **Public** so uploaded PDFs can be viewed. Document uploads (annual reports) require this. Add an RLS policy: run `prisma/migrations/storage_rls_policy.sql` in Supabase SQL Editor.
 
 ## 3. Build
 

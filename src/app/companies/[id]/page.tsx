@@ -216,8 +216,8 @@ export default function CompanyDetailPage() {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 15 * 1024 * 1024) {
-      toast("File too large. Maximum size is 15MB.", "error");
+    if (file.size > 30 * 1024 * 1024) {
+      toast("File too large. Maximum size is 30MB.", "error");
       return;
     }
     if (!file.name.toLowerCase().endsWith(".pdf")) {
@@ -233,14 +233,17 @@ export default function CompanyDetailPage() {
       });
       const urlData = await urlRes.json();
       if (!urlRes.ok) {
-        throw new Error(urlData.error || "Failed to get upload URL");
+        throw new Error(urlData.error || "Failed to get upload path");
       }
       const supabase = createClient();
       const { error: uploadError } = await supabase.storage
-        .from("company-documents")
-        .uploadToSignedUrl(urlData.path, urlData.token, file);
+        .from(urlData.bucket || "company-documents")
+        .upload(urlData.path, file, {
+          contentType: "application/pdf",
+          upsert: false,
+        });
       if (uploadError) {
-        throw new Error(uploadError.message || "Upload failed. Storage may be misconfigured.");
+        throw new Error(uploadError.message || "Upload failed. Add an RLS policy to allow uploads to the company-documents bucket.");
       }
       const createRes = await fetch(`/api/companies/${id}/documents`, {
         method: "POST",

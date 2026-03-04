@@ -8,13 +8,13 @@ import { join } from "path";
 
 const STORAGE_BUCKET = "company-documents";
 
-const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB
+const MAX_FILE_SIZE = 30 * 1024 * 1024; // 30MB
 const ALLOWED_TYPES = ["application/pdf"];
 const ALLOWED_EXTENSIONS = [".pdf"];
 
 function isAllowedFile(file: File): { ok: boolean; error?: string } {
   if (file.size > MAX_FILE_SIZE) {
-    return { ok: false, error: `File too large. Maximum size is 15MB.` };
+    return { ok: false, error: `File too large. Maximum size is 30MB.` };
   }
   const ext = "." + (file.name.split(".").pop() || "").toLowerCase();
   const typeOk = ALLOWED_TYPES.includes(file.type);
