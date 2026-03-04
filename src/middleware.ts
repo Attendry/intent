@@ -35,13 +35,26 @@ function isAuthPath(pathname: string): boolean {
 }
 
 export async function middleware(request: NextRequest) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error(
+      "Missing Supabase env: NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY"
+    );
+    return NextResponse.json(
+      { error: "Server misconfiguration: Supabase not configured" },
+      { status: 503 }
+    );
+  }
+
   const { pathname, searchParams } = request.nextUrl;
 
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {
@@ -56,32 +69,40 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  await supabase.auth.getUser();
+  try {
+    await supabase.auth.getUser();
 
-  if (isAuthPath(pathname)) {
-    return supabaseResponse;
-  }
-
-  if (isProtected(pathname, searchParams)) {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      if (pathname.startsWith("/api/")) {
-        return NextResponse.json(
-          { error: "Unauthorized" },
-          { status: 401, headers: { "Content-Type": "application/json" } }
-        );
-      }
-      const url = request.nextUrl.clone();
-      url.pathname = "/auth/login";
-      url.searchParams.set("redirect", pathname);
-      return Response.redirect(url);
+    if (isAuthPath(pathname)) {
+      return supabaseResponse;
     }
-  }
 
-  return supabaseResponse;
+    if (isProtected(pathname, searchParams)) {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        if (pathname.startsWith("/api/")) {
+          return NextResponse.json(
+            { error: "Unauthorized" },
+            { status: 401, headers: { "Content-Type": "application/json" } }
+          );
+        }
+        const url = request.nextUrl.clone();
+        url.pathname = "/auth/login";
+        url.searchParams.set("redirect", pathname);
+        return Response.redirect(url);
+      }
+    }
+
+    return supabaseResponse;
+  } catch (err) {
+    console.error("Middleware error:", err);
+    return NextResponse.json(
+      { error: "Authentication service unavailable" },
+      { status: 503 }
+    );
+  }
 }
 
 export const config = {
