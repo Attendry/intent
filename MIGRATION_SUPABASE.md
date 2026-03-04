@@ -9,8 +9,10 @@ Add these to your `.env` file (create from this template if needed):
 ```env
 # Database (Supabase PostgreSQL)
 # Get from: Supabase Dashboard → Project Settings → Database → Connection string (URI)
-# Use the "Transaction" pooler for migrations, or "Session" for direct connection
+# Transaction pooler (6543) - for runtime / serverless
 DATABASE_URL="postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres?pgbouncer=true"
+# Session/direct (5432) - for migrations (faster, avoids pooler timeouts during Vercel build)
+DIRECT_URL="postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:5432/postgres"
 
 # Supabase Auth
 # Get from: Supabase Dashboard → Project Settings → API
@@ -76,7 +78,7 @@ In your Supabase project dashboard:
 
 ## 4. Vercel Deployment
 
-1. Add all environment variables in Vercel Project Settings
+1. Add all environment variables in Vercel Project Settings (including `DIRECT_URL` for faster migrations during build)
 2. Deploy. The app will:
    - Redirect unauthenticated users to `/auth/login`
    - Create a User record on first sign-in
