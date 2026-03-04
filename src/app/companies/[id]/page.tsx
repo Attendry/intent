@@ -32,6 +32,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import Breadcrumbs from "@/components/breadcrumbs";
+import { createClient } from "@/lib/supabase/client";
 import { freshnessColor } from "@/lib/format";
 import { INTEL_TYPE_LABELS, INTEL_TYPE_COLORS } from "@/lib/constants";
 import FitAnalysisSection from "@/components/company/fit-analysis-section";
@@ -215,16 +216,52 @@ export default function CompanyDetailPage() {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > 15 * 1024 * 1024) {
+      toast("File too large. Maximum size is 15MB.", "error");
+      return;
+    }
+    if (!file.name.toLowerCase().endsWith(".pdf")) {
+      toast("Only PDF files are supported.", "error");
+      return;
+    }
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("title", file.name);
-      formData.append("type", docType);
-      await fetch(`/api/companies/${id}/documents`, { method: "POST", body: formData });
+      const urlRes = await fetch(`/api/companies/${id}/documents/upload-url`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename: file.name, title: file.name, type: docType }),
+      });
+      const urlData = await urlRes.json();
+      if (!urlRes.ok) {
+        throw new Error(urlData.error || "Failed to get upload URL");
+      }
+      const supabase = createClient();
+      const { error: uploadError } = await supabase.storage
+        .from("company-documents")
+        .uploadToSignedUrl(urlData.path, urlData.token, file);
+      if (uploadError) {
+        throw new Error(uploadError.message || "Upload failed. Storage may be misconfigured.");
+      }
+      const createRes = await fetch(`/api/companies/${id}/documents`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          storagePath: urlData.path,
+          title: urlData.title,
+          type: urlData.type,
+        }),
+      });
+      const createData = await createRes.json();
+      if (!createRes.ok) {
+        throw new Error(createData.error || "Failed to create document record");
+      }
       fetchCompany();
-    } catch { toast("Failed to upload document", "error"); } finally {
+      toast("Document uploaded. Processing started.", "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to upload document", "error");
+    } finally {
       setUploading(false);
+      e.target.value = "";
     }
   };
 
@@ -232,16 +269,21 @@ export default function CompanyDetailPage() {
     if (!docUrl.trim()) return;
     setUploading(true);
     try {
-      await fetch(`/api/companies/${id}/documents`, {
+      const res = await fetch(`/api/companies/${id}/documents`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: docUrl, title: docTitle || docUrl, type: docType }),
       });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to add document");
       setDocUrl("");
       setDocTitle("");
       setShowUpload(false);
       fetchCompany();
-    } catch { toast("Failed to add document", "error"); } finally {
+      toast("Document added. Processing started.", "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to add document", "error");
+    } finally {
       setUploading(false);
     }
   };

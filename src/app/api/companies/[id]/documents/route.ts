@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 import { documentUrlSchema, parseRequestBody } from "@/lib/validation";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { writeFile, mkdir, unlink } from "fs/promises";
 import { join } from "path";
+
+const STORAGE_BUCKET = "company-documents";
 
 const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB
 const ALLOWED_TYPES = ["application/pdf"];
@@ -103,12 +106,31 @@ export async function POST(
     if ("error" in parsed) return parsed.error;
     const body = parsed.data;
 
+    let sourceUrl: string;
+    if (body.storagePath) {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      if (!supabaseUrl) {
+        return NextResponse.json(
+          { error: "Storage not configured" },
+          { status: 503 }
+        );
+      }
+      sourceUrl = `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/public/company-documents/${body.storagePath}`;
+    } else if (body.url) {
+      sourceUrl = body.url;
+    } else {
+      return NextResponse.json(
+        { error: "url or storagePath is required" },
+        { status: 400 }
+      );
+    }
+
     const doc = await prisma.companyDocument.create({
       data: {
         companyId: id,
         title: body.title || "Linked Document",
         type: body.type || "other",
-        sourceUrl: body.url,
+        sourceUrl,
         status: "pending",
       },
     });
@@ -157,9 +179,22 @@ export async function DELETE(
     // Delete associated intel entries
     await prisma.companyIntel.deleteMany({ where: { documentId: docId } });
 
-    // Delete the file if it exists
+    // Delete the file if it exists (local filesystem)
     if (doc.filePath) {
       try { await unlink(doc.filePath); } catch { /* file may not exist */ }
+    }
+
+    // Delete from Supabase Storage if sourceUrl points to our bucket
+    if (doc.sourceUrl) {
+      const match = doc.sourceUrl.match(
+        /\/storage\/v1\/object\/public\/company-documents\/(.+)$/
+      );
+      if (match) {
+        try {
+          const supabase = createAdminClient();
+          await supabase.storage.from(STORAGE_BUCKET).remove([match[1]]);
+        } catch { /* storage may not be configured */ }
+      }
     }
 
     await prisma.companyDocument.delete({ where: { id: docId } });

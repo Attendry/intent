@@ -16,12 +16,14 @@ Set these for **Production** (and Preview if using a separate DB):
 | `GNEWS_API_KEY` | Optional | GNews. Or set in Settings. |
 | `PREDICTHQ_API_KEY` | Optional | PredictHQ (Events). Or set in Settings. |
 | `CRON_SECRET` | Yes | Min 16 chars; secures `/api/cron/*` endpoints |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes | For document uploads (company annual reports). From Supabase → Settings → API |
 | `NEXT_PUBLIC_BASE_URL` | Optional | Your Vercel URL (e.g. `https://your-app.vercel.app`) |
 
 ## 2. Supabase Configuration
 
 - **Auth → URL Configuration**: Add your Vercel URL and `https://your-app.vercel.app/auth/callback` to Redirect URLs
 - **Database**: Run `npx prisma migrate deploy` once (or let `vercel-build` do it on first deploy)
+- **Storage**: Create a bucket named `company-documents` (Storage → New bucket). Set it to **Public** so uploaded PDFs can be viewed. Document uploads (annual reports) require this.
 
 ## 3. Build
 

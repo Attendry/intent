@@ -130,9 +130,12 @@ export const createProspectSchema = z.object({
 });
 
 export const documentUrlSchema = z.object({
-  url: z.string().url(),
+  url: z.string().url().optional(),
+  storagePath: z.string().min(1).optional(),
   title: z.string().optional(),
   type: z.string().optional(),
+}).refine((d) => d.url || d.storagePath, {
+  message: "url or storagePath is required",
 });
 
 export const documentProcessSchema = z.object({
