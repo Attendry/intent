@@ -65,6 +65,12 @@ export default function PipelinePage() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const { toast } = useToast();
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    })
+  );
+
   const fetchPipeline = useCallback(async () => {
     try {
       const res = await fetch("/api/pipeline");
@@ -138,12 +144,6 @@ export default function PipelinePage() {
       </div>
     );
   }
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 8 },
-    })
-  );
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
