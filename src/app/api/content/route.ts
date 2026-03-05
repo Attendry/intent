@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { generateContentTags, getSettingsForUser } from "@/lib/ai";
 import { requireAuth } from "@/lib/auth";
 import { createContentSchema, parseRequestBody } from "@/lib/validation";
+import { createFragmentFromContent } from "@/lib/fragment-sync";
 
 export async function GET(request: NextRequest) {
   try {
@@ -90,6 +91,16 @@ export async function POST(request: NextRequest) {
         useCaseFit,
       },
     });
+
+    createFragmentFromContent({
+      id: content.id,
+      userId: content.userId,
+      title: content.title,
+      type: content.type,
+      summary: content.summary,
+      personaFit: content.personaFit,
+      useCaseFit: content.useCaseFit,
+    }).catch((e) => console.error("[fragment-sync] content:", e));
 
     return NextResponse.json(content, { status: 201 });
   } catch (error) {

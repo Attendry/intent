@@ -4,6 +4,7 @@ import { calculateNextFollowUp, type CadenceSettings } from "@/lib/cadence";
 import { requireAuth } from "@/lib/auth";
 import { getSettingsForUser } from "@/lib/ai";
 import { createOutreachSchema, parseRequestBody } from "@/lib/validation";
+import { createFragmentFromOutreachLog, updateFragmentStatusForSignal } from "@/lib/fragment-sync";
 
 export async function POST(request: NextRequest) {
   try {
@@ -56,6 +57,16 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    createFragmentFromOutreachLog({
+      id: outreachLog.id,
+      prospectId: outreachLog.prospectId,
+      channel: outreachLog.channel,
+      messageSent: outreachLog.messageSent,
+      subjectLine: outreachLog.subjectLine,
+      outcome: outreachLog.outcome,
+      notes: outreachLog.notes,
+    }).catch((e) => console.error("[fragment-sync] outreach:", e));
+
     await prisma.prospect.update({
       where: { id: body.prospectId },
       data: {
@@ -70,6 +81,9 @@ export async function POST(request: NextRequest) {
         where: { id: body.signalId },
         data: { actedOn: true },
       }).catch(() => {});
+      updateFragmentStatusForSignal(body.signalId, "acted").catch((e) =>
+        console.error("[fragment-sync] update signal status:", e)
+      );
     }
 
     return NextResponse.json(outreachLog, { status: 201 });

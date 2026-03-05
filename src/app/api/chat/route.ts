@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAIClient, getSettingsForUser } from "@/lib/ai";
 import { requireAuth } from "@/lib/auth";
+import { buildFragmentsForCompany, buildFragmentsForProspect } from "@/lib/fragment-builder";
 
 interface ChatContext {
   type: "prospect" | "company" | "general" | "pipeline" | "account";
@@ -405,6 +406,84 @@ async function loadPipelineContext(userId: string): Promise<string> {
   return parts.join("\n");
 }
 
+async function loadFragmentContextForGeneral(
+  userId: string,
+  query: string
+): Promise<string> {
+  if (!query || query.trim().length < 3) return "";
+  const q = query.trim();
+  const fragments = await prisma.knowledgeFragment.findMany({
+    where: {
+      userId,
+      status: "active",
+      content: { contains: q, mode: "insensitive" },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 15,
+    include: {
+      company: { select: { name: true } },
+      prospect: { select: { firstName: true, lastName: true } },
+    },
+  });
+  if (fragments.length === 0) return "";
+  const parts: string[] = ["\nRELEVANT KNOWLEDGE (from your data):"];
+  for (const r of fragments) {
+    const meta = [r.type];
+    if (r.company) meta.push(r.company.name);
+    if (r.prospect) meta.push(`${r.prospect.firstName} ${r.prospect.lastName}`);
+    parts.push(`- [${meta.join(", ")}] ${r.content.slice(0, 300)}${r.content.length > 300 ? "..." : ""}`);
+  }
+  return parts.join("\n");
+}
+
+async function loadFragmentContextForCompany(userId: string, companyId: string): Promise<string> {
+  try {
+    const set = await buildFragmentsForCompany(companyId, { limit: 15 });
+    const parts: string[] = [];
+    if (set.accountCoverage.prospectsTotal > 0) {
+      parts.push(
+        `\nACCOUNT COVERAGE: ${set.accountCoverage.prospectsContacted}/${set.accountCoverage.prospectsTotal} prospects contacted.`
+      );
+      if (set.accountCoverage.rolesMissing.length > 0) {
+        parts.push(`Roles not yet contacted: ${set.accountCoverage.rolesMissing.join(", ")}`);
+      }
+    }
+    if (set.fragments.length > 0) {
+      parts.push("\nRECENT FRAGMENTS:");
+      for (const f of set.fragments.slice(0, 10)) {
+        parts.push(`- [${f.type}] ${f.content.slice(0, 200)}${f.content.length > 200 ? "..." : ""}`);
+      }
+    }
+    return parts.join("\n");
+  } catch {
+    return "";
+  }
+}
+
+async function loadFragmentContextForProspect(userId: string, prospectId: string): Promise<string> {
+  try {
+    const { fragments, accountCoverage } = await buildFragmentsForProspect(prospectId);
+    const parts: string[] = [];
+    if (accountCoverage && accountCoverage.prospectsTotal > 0) {
+      parts.push(
+        `\nACCOUNT COVERAGE: ${accountCoverage.prospectsContacted}/${accountCoverage.prospectsTotal} prospects contacted.`
+      );
+      if (accountCoverage.rolesMissing.length > 0) {
+        parts.push(`Roles not yet contacted: ${accountCoverage.rolesMissing.join(", ")}`);
+      }
+    }
+    if (fragments.length > 0) {
+      parts.push("\nRECENT FRAGMENTS:");
+      for (const f of fragments.slice(0, 10)) {
+        parts.push(`- [${f.type}] ${f.content.slice(0, 200)}${f.content.length > 200 ? "..." : ""}`);
+      }
+    }
+    return parts.join("\n");
+  } catch {
+    return "";
+  }
+}
+
 async function loadAccountContext(userId: string, companyId: string): Promise<string> {
   const base = await loadCompanyContext(userId, companyId);
 
@@ -536,16 +615,35 @@ export async function POST(request: NextRequest) {
 
     // Page context (prospect, company, pipeline, account)
     if (context?.type === "prospect" && context.id) {
-      contextParts.push(await loadProspectContext(userId, context.id));
+      const [prospectCtx, fragmentCtx] = await Promise.all([
+        loadProspectContext(userId, context.id),
+        loadFragmentContextForProspect(userId, context.id),
+      ]);
+      contextParts.push(prospectCtx);
+      if (fragmentCtx) contextParts.push(fragmentCtx);
       loadedIds.add(`prospect:${context.id}`);
     } else if (context?.type === "company" && context.id) {
-      contextParts.push(await loadCompanyContext(userId, context.id));
+      const [companyCtx, fragmentCtx] = await Promise.all([
+        loadCompanyContext(userId, context.id),
+        loadFragmentContextForCompany(userId, context.id),
+      ]);
+      contextParts.push(companyCtx);
+      if (fragmentCtx) contextParts.push(fragmentCtx);
       loadedIds.add(`company:${context.id}`);
     } else if (context?.type === "pipeline") {
       contextParts.push(await loadPipelineContext(userId));
     } else if (context?.type === "account" && context.id) {
-      contextParts.push(await loadAccountContext(userId, context.id));
+      const [accountCtx, fragmentCtx] = await Promise.all([
+        loadAccountContext(userId, context.id),
+        loadFragmentContextForCompany(userId, context.id),
+      ]);
+      contextParts.push(accountCtx);
+      if (fragmentCtx) contextParts.push(fragmentCtx);
       loadedIds.add(`company:${context.id}`);
+    } else if (context?.type === "general" && message.trim().length >= 5) {
+      // RAG: for general questions, search fragments
+      const fragmentCtx = await loadFragmentContextForGeneral(userId, message);
+      if (fragmentCtx) contextParts.push(fragmentCtx);
     }
 
     // @ mention context (prospects, companies, content)

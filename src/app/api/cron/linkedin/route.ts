@@ -92,7 +92,7 @@ export async function GET(request: Request) {
           currentCompany !== prospect.company;
 
         if (titleChanged) {
-          await prisma.signal.create({
+          const sig = await prisma.signal.create({
             data: {
               prospectId: prospect.id,
               type: "job_change",
@@ -103,11 +103,22 @@ export async function GET(request: Request) {
               sourceUrl: prospect.linkedinUrl,
             },
           });
+          const { createFragmentFromSignal } = await import("@/lib/fragment-sync");
+          createFragmentFromSignal({
+            id: sig.id,
+            prospectId: sig.prospectId,
+            type: sig.type,
+            summary: sig.summary,
+            rawContent: sig.rawContent,
+            urgencyScore: sig.urgencyScore,
+            actedOn: sig.actedOn,
+            dismissed: sig.dismissed,
+          }).catch(() => {});
           signalsCreated++;
         }
 
         if (companyChanged) {
-          await prisma.signal.create({
+          const sig = await prisma.signal.create({
             data: {
               prospectId: prospect.id,
               type: "job_change",
@@ -118,6 +129,17 @@ export async function GET(request: Request) {
               sourceUrl: prospect.linkedinUrl,
             },
           });
+          const { createFragmentFromSignal } = await import("@/lib/fragment-sync");
+          createFragmentFromSignal({
+            id: sig.id,
+            prospectId: sig.prospectId,
+            type: sig.type,
+            summary: sig.summary,
+            rawContent: sig.rawContent,
+            urgencyScore: sig.urgencyScore,
+            actedOn: sig.actedOn,
+            dismissed: sig.dismissed,
+          }).catch(() => {});
           signalsCreated++;
         }
 

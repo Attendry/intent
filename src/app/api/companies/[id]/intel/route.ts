@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
-import { createIntelSchema, parseRequestBody } from "@/lib/validation";
+import { createFragmentFromCompanyIntel } from "@/lib/fragment-sync";
 
 export async function GET(
   _request: NextRequest,
@@ -65,6 +65,16 @@ export async function POST(
       },
     });
 
+    createFragmentFromCompanyIntel({
+      id: intel.id,
+      companyId: intel.companyId,
+      type: intel.type,
+      summary: intel.summary,
+      actionContext: intel.actionContext,
+      urgencyScore: intel.urgencyScore,
+      date: intel.date,
+    }).catch((e) => console.error("[fragment-sync] intel:", e));
+
     await prisma.company.update({
       where: { id },
       data: { intelCountSinceSynth: { increment: 1 } },
@@ -87,7 +97,7 @@ export async function POST(
           },
         });
         if (!existing) {
-          await prisma.signal.create({
+          const sig = await prisma.signal.create({
             data: {
               prospectId: prospect.id,
               type: intel.type,
@@ -97,6 +107,17 @@ export async function POST(
               outreachAngle: intel.actionContext,
             },
           });
+          const { createFragmentFromSignal } = await import("@/lib/fragment-sync");
+          createFragmentFromSignal({
+            id: sig.id,
+            prospectId: sig.prospectId,
+            type: sig.type,
+            summary: sig.summary,
+            rawContent: null,
+            urgencyScore: sig.urgencyScore,
+            actedOn: sig.actedOn,
+            dismissed: sig.dismissed,
+          }).catch((e) => console.error("[fragment-sync] signal:", e));
         }
       }
     }

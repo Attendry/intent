@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { documentProcessSchema, parseRequestBody } from "@/lib/validation";
 import { extractDocumentIntel } from "@/lib/ai";
+import { createFragmentFromCompanyDocument } from "@/lib/fragment-sync";
 import { readFile } from "fs/promises";
 
 export const maxDuration = 120;
@@ -229,7 +230,7 @@ export async function POST(
     await updateProgress(documentId, "saving", 85);
 
     // --- Stage 4: Save results ---
-    await prisma.companyDocument.update({
+    const updatedDoc = await prisma.companyDocument.update({
       where: { id: documentId },
       data: {
         status: "completed",
@@ -241,6 +242,14 @@ export async function POST(
         processedAt: new Date(),
       },
     });
+
+    createFragmentFromCompanyDocument({
+      id: updatedDoc.id,
+      companyId: updatedDoc.companyId,
+      title: updatedDoc.title,
+      type: updatedDoc.type,
+      fullSummary: updatedDoc.fullSummary,
+    }).catch((e) => console.error("[fragment-sync] companyDocument:", e));
 
     let intelCreated = 0;
     for (const entry of extraction.entries) {

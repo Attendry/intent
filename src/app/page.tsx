@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/toast";
+import Link from "next/link";
 import {
   Zap,
   Clock,
@@ -18,6 +19,8 @@ import {
   CheckSquare,
   Square,
   X,
+  Sparkles,
+  ChevronRight,
 } from "lucide-react";
 
 type FilterTab = "all" | "signal" | "followup" | "suggested";
@@ -40,6 +43,17 @@ export default function HomePage() {
   const [followUpCount, setFollowUpCount] = useState(0);
   const [suggestedCount, setSuggestedCount] = useState(0);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [briefItems, setBriefItems] = useState<Array<{
+    id: string;
+    type: string;
+    prospectName: string;
+    companyName: string | null;
+    summary: string;
+    nextBestAction: string;
+    ctaUrl: string;
+    sourceAttribution?: string;
+  }>>([]);
+  const [briefLoading, setBriefLoading] = useState(true);
   const router = useRouter();
   const { toast } = useToast();
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -80,6 +94,24 @@ export default function HomePage() {
   useEffect(() => {
     fetchQueue();
   }, [fetchQueue]);
+
+  const fetchBrief = useCallback(async () => {
+    try {
+      const res = await fetch("/api/brain/brief");
+      if (res.ok) {
+        const data = await res.json();
+        setBriefItems(data.items || []);
+      }
+    } catch {
+      setBriefItems([]);
+    } finally {
+      setBriefLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchBrief();
+  }, [fetchBrief]);
 
   const handleDismiss = async (signalId: string) => {
     const dismissedItem = items.find((i) => i.signal?.id === signalId);
@@ -264,6 +296,63 @@ export default function HomePage() {
             <>{total} prospect{total !== 1 ? "s" : ""} to reach out to today.</>
           )}
         </p>
+      </div>
+
+      {/* Today's Brief */}
+      <div className="mb-8">
+        <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-primary" />
+          Today&apos;s Brief
+        </h2>
+        {briefLoading ? (
+          <div className="rounded-xl border border-border/60 bg-card p-6">
+            <div className="flex items-center gap-3 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Loading priorities...
+            </div>
+          </div>
+        ) : briefItems.length === 0 ? (
+          <div className="rounded-xl border border-border/60 bg-card p-6 text-center">
+            <p className="text-sm text-muted-foreground">
+              Your daily priorities will appear here. Add prospects and companies to get started.
+            </p>
+            <Link href="/prospects/import" className="mt-2 inline-block text-sm text-primary hover:underline">
+              Import prospects
+            </Link>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-border/60 bg-card divide-y divide-border/60">
+            {briefItems.map((item) => (
+              <div
+                key={item.id}
+                className="flex items-center justify-between gap-4 p-4 hover:bg-muted/30 transition-colors"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {item.prospectName}
+                    {item.companyName && (
+                      <span className="text-muted-foreground font-normal"> at {item.companyName}</span>
+                    )}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                    {item.summary}
+                    {item.sourceAttribution && (
+                      <span className="ml-1">— {item.sourceAttribution}</span>
+                    )}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  className="shrink-0 gap-1"
+                  onClick={() => router.push(item.ctaUrl)}
+                >
+                  {item.nextBestAction}
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Filter stats + sort */}

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { verifyCronAuth } from "@/lib/cron-auth";
+import { createFragmentFromSignal } from "@/lib/fragment-sync";
 
 export async function GET(request: Request) {
   const authError = verifyCronAuth(request);
@@ -71,7 +72,7 @@ export async function GET(request: Request) {
         );
         const urgency = daysSince > 60 ? 3 : 2;
 
-        await prisma.signal.create({
+        const sig = await prisma.signal.create({
           data: {
             prospectId: prospect.id,
             type: "re_engagement",
@@ -82,6 +83,16 @@ export async function GET(request: Request) {
               : "No prior outreach — plan an initial touchpoint.",
           },
         });
+        createFragmentFromSignal({
+          id: sig.id,
+          prospectId: sig.prospectId,
+          type: sig.type,
+          summary: sig.summary,
+          rawContent: sig.rawContent,
+          urgencyScore: sig.urgencyScore,
+          actedOn: sig.actedOn,
+          dismissed: sig.dismissed,
+        }).catch(() => {});
         reEngagementCreated++;
       }
 
@@ -101,7 +112,7 @@ export async function GET(request: Request) {
         if (prospect.outreach.length > 0) continue;
         if (prospect.signals.length > 0) continue;
 
-        await prisma.signal.create({
+        const sig = await prisma.signal.create({
           data: {
             prospectId: prospect.id,
             type: "new_prospect",
@@ -112,6 +123,16 @@ export async function GET(request: Request) {
               : "Consider enriching persona before reaching out.",
           },
         });
+        createFragmentFromSignal({
+          id: sig.id,
+          prospectId: sig.prospectId,
+          type: sig.type,
+          summary: sig.summary,
+          rawContent: sig.rawContent,
+          urgencyScore: sig.urgencyScore,
+          actedOn: sig.actedOn,
+          dismissed: sig.dismissed,
+        }).catch(() => {});
         newProspectCreated++;
       }
     }

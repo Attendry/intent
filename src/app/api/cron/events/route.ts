@@ -135,7 +135,7 @@ export async function GET(request: Request) {
               ? `Upcoming: ${prospect.company || companyLower} at ${eventTitle} on ${eventDate}`
               : `Industry event: ${eventTitle} on ${eventDate} — relevant to ${prospect.firstName}'s sector`;
 
-            await prisma.signal.create({
+            const sig = await prisma.signal.create({
               data: {
                 prospectId: prospect.id,
                 type: "conference",
@@ -148,6 +148,17 @@ export async function GET(request: Request) {
                   : `Relevant industry event — use as conversation opener.`,
               },
             });
+            const { createFragmentFromSignal } = await import("@/lib/fragment-sync");
+            createFragmentFromSignal({
+              id: sig.id,
+              prospectId: sig.prospectId,
+              type: sig.type,
+              summary: sig.summary,
+              rawContent: sig.rawContent,
+              urgencyScore: sig.urgencyScore,
+              actedOn: sig.actedOn,
+              dismissed: sig.dismissed,
+            }).catch(() => {});
             signalsCreated++;
           }
 

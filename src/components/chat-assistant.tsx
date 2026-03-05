@@ -53,6 +53,7 @@ const PROSPECT_STARTERS = [
 ];
 
 const COMPANY_STARTERS = [
+  "Prep for call",
   "Who should I talk to next?",
   "What are their biggest risks?",
   "Competitive positioning",
@@ -369,6 +370,29 @@ export default function ChatAssistant() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
+
+  // Global event: open chat with optional message (e.g. "Prep for call" from entity pages)
+  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handler = (e: Event) => {
+      const msg = (e as CustomEvent<{ message?: string }>).detail?.message;
+      setOpen(true);
+      if (msg?.trim()) {
+        setPendingMessage(msg.trim());
+      } else {
+        setTimeout(() => inputRef.current?.focus(), 100);
+      }
+    };
+    window.addEventListener("intent:open-chat", handler);
+    return () => window.removeEventListener("intent:open-chat", handler);
+  }, []);
+  useEffect(() => {
+    if (open && pendingMessage && !streaming) {
+      sendMessage(pendingMessage);
+      setPendingMessage(null);
+    }
+  }, [open, pendingMessage, streaming, sendMessage]);
 
   // @ mention search
   useEffect(() => {

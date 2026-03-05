@@ -10,6 +10,7 @@ import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import Breadcrumbs from "@/components/breadcrumbs";
+import { BrainNudgeCard } from "@/components/brain-nudge-card";
 import { useToast } from "@/components/ui/toast";
 import RelationshipTimeline from "@/components/relationship-timeline";
 import { cn } from "@/lib/utils";
@@ -463,23 +464,10 @@ export default function ProspectDetailPage() {
     }
   };
 
-  const handleCallPrep = async () => {
-    if (!prospect) return;
-    openPrepPanel(`Call Briefing — ${prospect.firstName} ${prospect.lastName}`, "call");
-    try {
-      const res = await fetch("/api/intelligence/prep", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prospectId: prospect.id }),
-      });
-      if (!res.ok) throw new Error("Failed to generate prep");
-      const data = await res.json();
-      setPrepBriefing(data.briefing || "No briefing generated.");
-    } catch {
-      setPrepBriefing("Failed to generate call briefing. Please try again.");
-    } finally {
-      setPrepLoading(false);
-    }
+  const handlePrepForCall = () => {
+    window.dispatchEvent(
+      new CustomEvent("intent:open-chat", { detail: { message: "Prep me for a call" } })
+    );
   };
 
   const handleDraftTemplate = async (channel: "email" | "linkedin", lang?: string) => {
@@ -516,7 +504,7 @@ export default function ProspectDetailPage() {
 
   const handleRegenerate = () => {
     if (!draftChannel || draftChannel === "call") {
-      handleCallPrep();
+      handlePrepForCall();
     } else {
       handleDraftTemplate(draftChannel, draftLang);
     }
@@ -687,6 +675,8 @@ export default function ProspectDetailPage() {
           ]}
         />
       </div>
+
+      <BrainNudgeCard prospectId={prospect.id} companyId={prospect.companyId ?? undefined} />
 
       {/* Profile header card */}
       <Card className="mb-6 overflow-hidden">
@@ -931,9 +921,9 @@ export default function ProspectDetailPage() {
               </div>
 
               <div className="flex flex-wrap gap-2 justify-end">
-                <Button onClick={handleCallPrep} className="gap-1.5" size="sm">
+                <Button onClick={handlePrepForCall} className="gap-1.5" size="sm" title="Get a one-pager for your next conversation">
                   <PhoneIcon className="h-3.5 w-3.5" />
-                  Call Briefing
+                  Prep for call
                 </Button>
                 <Button onClick={() => handleDraftTemplate("email", prospect.preferredLang || "en")} variant="outline" size="sm" className="gap-1.5">
                   <Mail className="h-3.5 w-3.5" />

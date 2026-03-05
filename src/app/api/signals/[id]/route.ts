@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 import { updateSignalSchema, parseRequestBody } from "@/lib/validation";
+import { updateFragmentStatusForSignal } from "@/lib/fragment-sync";
 
 export async function PUT(
   request: NextRequest,
@@ -37,6 +38,13 @@ export async function PUT(
     if (body.private !== undefined) data.private = body.private;
 
     const signal = await prisma.signal.update({ where: { id }, data });
+
+    if (body.actedOn === true || body.dismissed === true) {
+      updateFragmentStatusForSignal(id, "acted").catch((e) =>
+        console.error("[fragment-sync] update signal status:", e)
+      );
+    }
+
     return NextResponse.json(signal);
   } catch (error) {
     console.error("PUT /api/signals/[id] error:", error);

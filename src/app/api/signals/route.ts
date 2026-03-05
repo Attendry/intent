@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 import { createSignalSchema, parseRequestBody } from "@/lib/validation";
+import { createFragmentFromSignal } from "@/lib/fragment-sync";
 
 export async function GET(request: NextRequest) {
   try {
@@ -81,6 +82,17 @@ export async function POST(request: NextRequest) {
         private: body.private ?? false,
       },
     });
+
+    createFragmentFromSignal({
+      id: signal.id,
+      prospectId: signal.prospectId,
+      type: signal.type,
+      summary: signal.summary,
+      rawContent: signal.rawContent,
+      urgencyScore: signal.urgencyScore,
+      actedOn: signal.actedOn,
+      dismissed: signal.dismissed,
+    }).catch((e) => console.error("[fragment-sync] signal:", e));
 
     return NextResponse.json(signal, { status: 201 });
   } catch (error) {

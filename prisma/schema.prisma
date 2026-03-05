@@ -23,6 +23,7 @@ model User {
   companyProfile       CompanyProfile?
   voiceExamples        VoiceExample[]
   prospectSuggestions  ProspectSuggestion[]
+  knowledgeFragments    KnowledgeFragment[]
 }
 
 model UserSettings {
@@ -68,6 +69,7 @@ model Prospect {
   outreach      OutreachLog[]
   meetingLogs   MeetingLog[]
   savedFindings SavedFinding[]
+  knowledgeFragments KnowledgeFragment[]
 
   @@unique([userId, email])
   @@index([userId])
@@ -223,6 +225,7 @@ model Company {
   intel     CompanyIntel[]
   documents CompanyDocument[]
   savedFindings SavedFinding[]
+  knowledgeFragments KnowledgeFragment[]
 
   @@unique([userId, name])
   @@index([userId])
@@ -316,4 +319,28 @@ model CompanyDocument {
 
   @@index([companyId])
   @@index([status])
+}
+
+model KnowledgeFragment {
+  id         String   @id @default(cuid())
+  userId     String
+  companyId  String?
+  prospectId String?
+  type       String   // intel, finding, signal, outreach, synthesis, content, document, competitive, manual
+  sourceId   String   // e.g. companyIntel:xyz, savedFinding:abc
+  content    String
+  metadata   String?  // JSON: urgency, date, tags, actionContext, pipelineStage, fitBucket
+  status     String   @default("active") // active, acted, dismissed
+  createdAt  DateTime @default(now())
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company  Company?  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  prospect Prospect? @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([companyId])
+  @@index([prospectId])
+  @@index([type])
+  @@index([status])
+  @@index([createdAt])
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 import { generateMeetingSummary } from "@/lib/ai";
+import { createFragmentFromMeetingLog } from "@/lib/fragment-sync";
 
 export async function POST(request: NextRequest) {
   try {
@@ -69,6 +70,16 @@ export async function POST(request: NextRequest) {
         meetingDate: meetingDate ? new Date(meetingDate) : null,
       },
     });
+
+    createFragmentFromMeetingLog({
+      id: meetingLog.id,
+      prospectId: meetingLog.prospectId,
+      userId: meetingLog.userId,
+      summary: meetingLog.summary,
+      notes: meetingLog.notes,
+      actionItems: meetingLog.actionItems,
+      outcome: meetingLog.outcome,
+    }).catch((e) => console.error("[fragment-sync] meetingLog:", e));
 
     return NextResponse.json({
       ...meetingLog,

@@ -25,6 +25,7 @@ import {
   Save,
   X,
   Trash2,
+  Phone as PhoneIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select } from "@/components/ui/select";
@@ -32,6 +33,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import Breadcrumbs from "@/components/breadcrumbs";
+import { BrainNudgeCard } from "@/components/brain-nudge-card";
 import { createClient } from "@/lib/supabase/client";
 import { freshnessColor } from "@/lib/format";
 import { INTEL_TYPE_LABELS, INTEL_TYPE_COLORS } from "@/lib/constants";
@@ -465,15 +467,32 @@ export default function CompanyDetailPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-6">
         <Breadcrumbs items={[{ label: "Companies", href: "/companies" }, { label: company.name }]} />
-        <Link href={`/companies/${id}/account`}>
-          <Button variant="outline" size="sm" className="gap-1.5">
-            <Users className="h-3.5 w-3.5" />
-            Account View
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            className="gap-1.5"
+            title="Get a one-pager for your next conversation"
+            onClick={() =>
+              window.dispatchEvent(
+                new CustomEvent("intent:open-chat", { detail: { message: "Prep for call" } })
+              )
+            }
+          >
+            <PhoneIcon className="h-3.5 w-3.5" />
+            Prep for call
           </Button>
-        </Link>
+          <Link href={`/companies/${id}/account`}>
+            <Button variant="outline" size="sm" className="gap-1.5">
+              <Users className="h-3.5 w-3.5" />
+              Account View
+            </Button>
+          </Link>
+        </div>
       </div>
+
+      <BrainNudgeCard companyId={id} />
 
       {/* Metadata Card */}
       <div className="rounded-xl border border-border bg-card p-6 shadow-soft">

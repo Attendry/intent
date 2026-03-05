@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
+import { createFragmentFromSavedFinding } from "@/lib/fragment-sync";
 
 export async function GET() {
   try {
@@ -85,6 +86,13 @@ export async function POST(request: NextRequest) {
         },
       },
     });
+
+    createFragmentFromSavedFinding({
+      id: finding.id,
+      content: finding.content,
+      prospectId: finding.prospectId,
+      companyId: finding.companyId,
+    }).catch((e) => console.error("[fragment-sync] finding:", e));
 
     return NextResponse.json(finding);
   } catch (e) {

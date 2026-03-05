@@ -151,7 +151,7 @@ export async function GET(request: Request) {
                 }
               }
 
-              await prisma.signal.create({
+              const sig = await prisma.signal.create({
                 data: {
                   prospectId: prospect.id,
                   type: isConference ? "conference" : signalType,
@@ -162,6 +162,17 @@ export async function GET(request: Request) {
                   outreachAngle,
                 },
               });
+              const { createFragmentFromSignal } = await import("@/lib/fragment-sync");
+              createFragmentFromSignal({
+                id: sig.id,
+                prospectId: sig.prospectId,
+                type: sig.type,
+                summary: sig.summary,
+                rawContent: sig.rawContent,
+                urgencyScore: sig.urgencyScore,
+                actedOn: sig.actedOn,
+                dismissed: sig.dismissed,
+              }).catch(() => {});
               signalsCreated++;
             }
 

@@ -4,6 +4,7 @@ import { captureSchema, parseRequestBody } from "@/lib/validation";
 import { cleanScrapedContent, extractLeadSummary } from "@/lib/content-cleanup";
 import { findOrCreateCompany } from "@/lib/company-utils";
 import { getCaptureAuth } from "@/lib/auth";
+import { createFragmentFromSignal } from "@/lib/fragment-sync";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -201,6 +202,16 @@ export async function POST(request: NextRequest) {
           urgencyScore: body.urgencyScore ?? 3,
         },
       });
+      createFragmentFromSignal({
+        id: signal.id,
+        prospectId: signal.prospectId,
+        type: signal.type,
+        summary: signal.summary,
+        rawContent: signal.rawContent,
+        urgencyScore: signal.urgencyScore,
+        actedOn: signal.actedOn,
+        dismissed: signal.dismissed,
+      }).catch((e) => console.error("[fragment-sync] signal:", e));
     }
 
     return NextResponse.json(
