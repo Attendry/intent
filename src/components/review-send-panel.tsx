@@ -121,9 +121,11 @@ export default function ReviewSendPanel({
     [prospect.id, signal.id]
   );
 
+  // Initial fetch only; channel/language/template changes trigger fetchDraft via handlers
   useEffect(() => {
     fetchDraft(channel, language, templateUseCase);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: run once on mount
+  }, []);
 
   const handleChannelChange = (ch: Channel) => {
     setChannel(ch);

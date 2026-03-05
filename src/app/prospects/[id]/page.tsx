@@ -991,7 +991,9 @@ export default function ProspectDetailPage() {
                   const archetype = prospect.roleArchetype || "general";
                   const briefing = cache[archetype] || cache["general"] || Object.values(cache)[0];
                   if (briefing) return <p className="text-sm leading-relaxed text-foreground">{briefing as string}</p>;
-                } catch { /* ignore */ }
+                } catch {
+                  /* malformed roleBriefingCache JSON */
+                }
               }
               return <p className="text-sm text-muted-foreground italic">Company context will appear after synthesis runs.</p>;
             })()}

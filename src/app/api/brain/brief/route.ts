@@ -191,8 +191,10 @@ export async function GET() {
     const goingCold = await prisma.prospect.findMany({
       where: {
         userId,
-        lastContactedAt: { lte: staleCutoff },
-        lastContactedAt: { not: null },
+        AND: [
+          { lastContactedAt: { lte: staleCutoff } },
+          { lastContactedAt: { not: null } },
+        ],
         companyId: { not: null },
       },
       include: {
@@ -251,8 +253,10 @@ export async function GET() {
     const byBucket: Record<string, BriefItem[]> = {};
     for (const b of FIT_BUCKETS) byBucket[b] = [];
     byBucket["_none"] = [];
+    const fitBucketSet = new Set<string>(FIT_BUCKETS);
     for (const i of topItems) {
-      const b = i.fitBucket && FIT_BUCKETS.includes(i.fitBucket) ? i.fitBucket : "_none";
+      const b =
+        i.fitBucket && fitBucketSet.has(i.fitBucket) ? i.fitBucket : "_none";
       byBucket[b].push(i);
     }
 

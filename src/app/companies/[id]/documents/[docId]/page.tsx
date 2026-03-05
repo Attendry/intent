@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import type { PDFDocumentProxy } from "pdfjs-dist";
 import { Button } from "@/components/ui/button";
 import {
   ArrowLeft,
@@ -85,14 +86,12 @@ export default function DocumentViewerPage() {
 
   // PDF state
   const pageContainerRef = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [pdfDoc, setPdfDoc] = useState<any>(null);
+  const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [scale, setScale] = useState(1.3);
   const [rendering, setRendering] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const renderTaskRef = useRef<any>(null);
+  const renderTaskRef = useRef<{ cancel: () => void; promise: Promise<void> } | null>(null);
 
   // Selection state
   const [selectedText, setSelectedText] = useState("");
@@ -121,16 +120,15 @@ export default function DocumentViewerPage() {
       setCompanyName(companyData.name || "");
 
       const docData = companyData.documents?.find(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (d: any) => d.id === docId
+        (d: DocumentMeta) => d.id === docId
       );
       if (docData) setDoc(docData);
 
       const allIntel: IntelEntry[] = await intelRes.json();
       const docIntel = allIntel.filter((i) => i.documentId === docId);
       setIntel(docIntel);
-    } catch {
-      /* ignore */
+    } catch (err) {
+      console.error("[DocumentViewer] fetchData failed:", err);
     } finally {
       setLoading(false);
     }
@@ -170,89 +168,6 @@ export default function DocumentViewerPage() {
       cancelled = true;
     };
   }, [doc, loading, companyId, docId, pageQuery]);
-
-  // Render the current page (canvas + text layer)
-  useEffect(() => {
-    if (!pdfDoc || !pageContainerRef.current) return;
-    let cancelled = false;
-
-    async function renderPage() {
-      setRendering(true);
-      const page = await pdfDoc.getPage(currentPage);
-      const viewport = page.getViewport({ scale });
-      const container = pageContainerRef.current!;
-
-      // Clear previous render
-      container.innerHTML = "";
-
-      // Wrapper div that holds both canvas and text layer
-      const wrapper = document.createElement("div");
-      wrapper.style.position = "relative";
-      wrapper.style.width = `${viewport.width}px`;
-      wrapper.style.height = `${viewport.height}px`;
-      container.appendChild(wrapper);
-
-      // Canvas
-      const canvas = document.createElement("canvas");
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      canvas.style.display = "block";
-      wrapper.appendChild(canvas);
-
-      const ctx = canvas.getContext("2d")!;
-
-      if (renderTaskRef.current) {
-        try {
-          renderTaskRef.current.cancel();
-        } catch {
-          /* ignore */
-        }
-      }
-
-      const renderTask = page.render({ canvasContext: ctx, viewport });
-      renderTaskRef.current = renderTask;
-
-      try {
-        await renderTask.promise;
-      } catch {
-        if (cancelled) return;
-      }
-      if (cancelled) return;
-
-      // Text layer - use the pdfjs-dist TextLayer class
-      const pdfjsLib = await import("pdfjs-dist");
-      const textContent = await page.getTextContent();
-
-      const textLayerDiv = document.createElement("div");
-      textLayerDiv.className = "textLayer";
-      textLayerDiv.style.position = "absolute";
-      textLayerDiv.style.top = "0";
-      textLayerDiv.style.left = "0";
-      textLayerDiv.style.width = `${viewport.width}px`;
-      textLayerDiv.style.height = `${viewport.height}px`;
-      wrapper.appendChild(textLayerDiv);
-
-      const textLayer = new pdfjsLib.TextLayer({
-        textContentSource: textContent,
-        container: textLayerDiv,
-        viewport,
-      });
-
-      await textLayer.render();
-
-      if (cancelled) return;
-
-      // Apply highlights
-      applyHighlights(textLayerDiv);
-      setRendering(false);
-    }
-
-    renderPage().catch(console.error);
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pdfDoc, currentPage, scale, intel, activeIntelId, highlightQuery]);
 
   // Apply text highlights by searching through text layer spans
   const applyHighlights = useCallback(
@@ -335,6 +250,89 @@ export default function DocumentViewerPage() {
     [highlightQuery, intel, activeIntelId, currentPage]
   );
 
+  // Render the current page (canvas + text layer)
+  useEffect(() => {
+    if (!pdfDoc || !pageContainerRef.current) return;
+    const doc = pdfDoc;
+    let cancelled = false;
+
+    async function renderPage() {
+      setRendering(true);
+      const page = await doc.getPage(currentPage);
+      const viewport = page.getViewport({ scale });
+      const container = pageContainerRef.current!;
+
+      // Clear previous render
+      container.innerHTML = "";
+
+      // Wrapper div that holds both canvas and text layer
+      const wrapper = document.createElement("div");
+      wrapper.style.position = "relative";
+      wrapper.style.width = `${viewport.width}px`;
+      wrapper.style.height = `${viewport.height}px`;
+      container.appendChild(wrapper);
+
+      // Canvas
+      const canvas = document.createElement("canvas");
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      canvas.style.display = "block";
+      wrapper.appendChild(canvas);
+
+      const ctx = canvas.getContext("2d")!;
+
+      if (renderTaskRef.current) {
+        try {
+          renderTaskRef.current.cancel();
+        } catch {
+          /* ignore */
+        }
+      }
+
+      const renderTask = page.render({ canvasContext: ctx, viewport });
+      renderTaskRef.current = renderTask;
+
+      try {
+        await renderTask.promise;
+      } catch {
+        if (cancelled) return;
+      }
+      if (cancelled) return;
+
+      // Text layer - use the pdfjs-dist TextLayer class
+      const pdfjsLib = await import("pdfjs-dist");
+      const textContent = await page.getTextContent();
+
+      const textLayerDiv = document.createElement("div");
+      textLayerDiv.className = "textLayer";
+      textLayerDiv.style.position = "absolute";
+      textLayerDiv.style.top = "0";
+      textLayerDiv.style.left = "0";
+      textLayerDiv.style.width = `${viewport.width}px`;
+      textLayerDiv.style.height = `${viewport.height}px`;
+      wrapper.appendChild(textLayerDiv);
+
+      const textLayer = new pdfjsLib.TextLayer({
+        textContentSource: textContent,
+        container: textLayerDiv,
+        viewport,
+      });
+
+      await textLayer.render();
+
+      if (cancelled) return;
+
+      // Apply highlights
+      applyHighlights(textLayerDiv);
+      setRendering(false);
+    }
+
+    renderPage().catch(console.error);
+    return () => {
+      cancelled = true;
+    };
+  }, [pdfDoc, currentPage, scale, intel, activeIntelId, highlightQuery, applyHighlights]);
+
   // Handle text selection for creating intel
   useEffect(() => {
     const handleMouseUp = (e: MouseEvent) => {
@@ -397,8 +395,8 @@ export default function DocumentViewerPage() {
       setSelectedText("");
       setSelectionPos(null);
       fetchData();
-    } catch {
-      /* ignore */
+    } catch (err) {
+      console.error("[DocumentViewer] handleSaveIntel failed:", err);
     } finally {
       setSaving(false);
     }

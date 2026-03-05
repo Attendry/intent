@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { debugLog } from "@/lib/debug";
 import { generatePersonaSummary } from "@/lib/ai";
 
 export async function enrichProspect(userId: string, prospectId: string): Promise<void> {
@@ -6,11 +7,11 @@ export async function enrichProspect(userId: string, prospectId: string): Promis
   if (!prospect) throw new Error(`Prospect ${prospectId} not found`);
 
   if (prospect.personaSummary) {
-    console.log(`[enrich] Skipping ${prospect.firstName} ${prospect.lastName} — already has persona`);
+    debugLog(`[enrich] Skipping ${prospect.firstName} ${prospect.lastName} — already has persona`);
     return;
   }
 
-  console.log(`[enrich] Generating persona for ${prospect.firstName} ${prospect.lastName}…`);
+  debugLog(`[enrich] Generating persona for ${prospect.firstName} ${prospect.lastName}…`);
   const result = await generatePersonaSummary({
     userId,
     firstName: prospect.firstName,
@@ -27,7 +28,7 @@ export async function enrichProspect(userId: string, prospectId: string): Promis
       roleArchetype: result.roleArchetype,
     },
   });
-  console.log(`[enrich] ✓ Persona saved for ${prospect.firstName} ${prospect.lastName} (archetype: ${result.roleArchetype})`);
+  debugLog(`[enrich] ✓ Persona saved for ${prospect.firstName} ${prospect.lastName} (archetype: ${result.roleArchetype})`);
 }
 
 export async function enrichImportBatch(userId: string, prospectIds: string[]): Promise<{

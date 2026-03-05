@@ -72,7 +72,9 @@ export default function CompaniesPage() {
       const res = await fetch("/api/companies");
       const data = await res.json();
       setCompanies(data.data || data);
-    } catch { /* ignore */ } finally {
+    } catch (err) {
+      console.error("[Companies] fetchCompanies failed:", err);
+    } finally {
       setLoading(false);
     }
   }, []);
@@ -98,7 +100,9 @@ export default function CompaniesPage() {
       setNewName("");
       setShowCreate(false);
       fetchCompanies();
-    } catch { /* ignore */ } finally {
+    } catch (err) {
+      console.error("[Companies] handleCreate failed:", err);
+    } finally {
       setCreating(false);
     }
   };
@@ -112,7 +116,9 @@ export default function CompaniesPage() {
         body: JSON.stringify({ sourceId, targetId }),
       });
       fetchCompanies();
-    } catch { /* ignore */ } finally {
+    } catch (err) {
+      console.error("[Companies] handleMerge failed:", err);
+    } finally {
       setMerging(null);
     }
   };

@@ -347,7 +347,9 @@ export default function ChatAssistant() {
         const data = await res.json();
         if (data.name) return ctx.type === "account" ? `Account: ${data.name}` : data.name;
       }
-    } catch { /* */ }
+    } catch (err) {
+      console.error("[ChatAssistant] resolveLabel failed:", err);
+    }
     if (ctx.type === "pipeline") return "Pipeline";
     if (ctx.type === "account") return "Account";
     return ctx.type === "prospect" ? "Prospect" : "Company";

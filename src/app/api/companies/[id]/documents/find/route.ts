@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { debugLog } from "@/lib/debug";
 import { getAIClient, getSettingsForUser } from "@/lib/ai";
 import { requireAuth } from "@/lib/auth";
 
@@ -148,7 +149,7 @@ If you truly cannot find any report, respond:
     let validCandidate: (typeof candidates)[0] | null = null;
 
     for (const candidate of candidates) {
-      console.log("[doc-find] Validating URL:", candidate.url);
+      debugLog("[doc-find] Validating URL:", candidate.url);
       const check = await validateUrl(candidate.url);
 
       if (check.ok) {
@@ -158,14 +159,14 @@ If you truly cannot find any report, respond:
         validCandidate = candidate;
         break;
       } else {
-        console.log("[doc-find] URL returned non-200, skipping:", candidate.url);
+        debugLog("[doc-find] URL returned non-200, skipping:", candidate.url);
       }
     }
 
     if (!validCandidate) {
       // If no URLs validated, tell the user what we tried
       const triedUrls = candidates.map((c) => c.url).join(", ");
-      console.log("[doc-find] No valid URLs found. Tried:", triedUrls);
+      debugLog("[doc-find] No valid URLs found. Tried:", triedUrls);
       return NextResponse.json({
         error: `Found ${candidates.length} potential URL(s) but none were accessible. The documents may require authentication or the URLs may have changed. You can try uploading the PDF manually.`,
         triedUrls: candidates.map((c) => c.url),

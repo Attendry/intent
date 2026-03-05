@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { debugLog } from "@/lib/debug";
 import { documentProcessSchema, parseRequestBody } from "@/lib/validation";
 import { extractDocumentIntel } from "@/lib/ai";
 import { createFragmentFromCompanyDocument } from "@/lib/fragment-sync";
@@ -82,12 +83,12 @@ export async function POST(
 
     try {
       if (doc.filePath) {
-        console.log("[doc-process] Reading local file:", doc.filePath);
+        debugLog("[doc-process] Reading local file:", doc.filePath);
         const fileData = await readFile(doc.filePath);
         rawBuffer = new Uint8Array(fileData);
         isPdf = doc.filePath.toLowerCase().endsWith(".pdf");
       } else if (doc.sourceUrl) {
-        console.log("[doc-process] Downloading:", doc.sourceUrl);
+        debugLog("[doc-process] Downloading:", doc.sourceUrl);
         const response = await downloadWithHeaders(doc.sourceUrl);
 
         if (!response.ok) {
@@ -120,7 +121,7 @@ export async function POST(
           }
         }
 
-        console.log(
+        debugLog(
           `[doc-process] Downloaded ${rawBuffer.length} bytes, isPdf=${isPdf}`
         );
       } else {
@@ -151,7 +152,7 @@ export async function POST(
             "File does not start with %PDF header — may not be a valid PDF. The URL might redirect to a login page."
           );
         }
-        console.log("[doc-process] Parsing PDF...");
+        debugLog("[doc-process] Parsing PDF...");
         rawText = await parsePdf(rawBuffer);
       } else {
         const html = new TextDecoder().decode(rawBuffer);
@@ -173,7 +174,7 @@ export async function POST(
         );
       }
 
-      console.log(
+      debugLog(
         `[doc-process] Parsed ${rawText.length} chars of text`
       );
     } catch (err) {
@@ -202,7 +203,7 @@ export async function POST(
 
     let extraction;
     try {
-      console.log(
+      debugLog(
         "[doc-process] Running AI extraction for",
         company.name
       );
@@ -212,7 +213,7 @@ export async function POST(
         company.name,
         doc.type
       );
-      console.log(
+      debugLog(
         `[doc-process] AI extracted ${extraction.entries.length} intel entries`
       );
     } catch (err) {
@@ -275,7 +276,7 @@ export async function POST(
       });
     }
 
-    console.log(
+    debugLog(
       `[doc-process] Complete: ${intelCreated} intel entries saved`
     );
 

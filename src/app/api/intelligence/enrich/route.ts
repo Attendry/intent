@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { debugLog } from "@/lib/debug";
 import { enrichProspect, enrichImportBatch } from "@/lib/enrichment";
 import { getAIClient } from "@/lib/ai";
 import { requireAuth } from "@/lib/auth";
@@ -24,9 +25,9 @@ export async function POST(request: NextRequest) {
     const body = parsed.data;
 
     if (body.prospectIds && body.prospectIds.length > 0) {
-      console.log(`[enrich] Starting batch enrichment for ${body.prospectIds.length} prospects`);
+      debugLog(`[enrich] Starting batch enrichment for ${body.prospectIds.length} prospects`);
       const result = await enrichImportBatch(userId, body.prospectIds);
-      console.log(`[enrich] Done — ${result.succeeded.length} succeeded, ${result.failed.length} failed`);
+      debugLog(`[enrich] Done — ${result.succeeded.length} succeeded, ${result.failed.length} failed`);
       return NextResponse.json(result);
     }
 

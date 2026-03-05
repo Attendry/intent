@@ -167,7 +167,7 @@ export async function buildFragmentsForCompany(
     ...new Set(
       fragmentItems
         .map((f) => f.metadata.pipelineStage as string | undefined)
-        .filter(Boolean)
+        .filter((s): s is string => Boolean(s))
     ),
   ];
 
