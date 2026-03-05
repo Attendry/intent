@@ -196,6 +196,14 @@ export const suggestionActionSchema = z.object({
   action: z.enum(["approve", "dismiss"]),
 });
 
+export const eventAttendeesImportSchema = z.object({
+  url: z.string().url().optional(),
+  text: z.string().min(50).optional(),
+  eventName: z.string().max(200).optional(),
+}).refine((d) => !!(d.url || (d.text && d.text.trim().length >= 50)), {
+  message: "url or text (min 50 chars) is required",
+});
+
 export const companyProfilePutSchema = z.object({
   website: z.string().url(),
 });

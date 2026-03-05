@@ -454,6 +454,61 @@ Respond in JSON: { "signals": [ { "type": "...", "summary": "...", "urgencyScore
   }
 }
 
+export interface EventAttendee {
+  firstName: string;
+  lastName: string;
+  title?: string | null;
+  company?: string | null;
+}
+
+export async function extractEventAttendees(
+  userId: string,
+  text: string,
+  eventName?: string | null
+): Promise<EventAttendee[]> {
+  const system = `You are a B2B sales intelligence analyst. Extract a list of attendees/participants from event content (conference website, prospectus, attendee list, speaker list, etc.).
+
+For each person mentioned, produce:
+- firstName: first or given name
+- lastName: last or family name (if only one name given, use it as lastName and leave firstName empty or use a placeholder)
+- title: job title if mentioned (e.g. "VP Sales", "CTO")
+- company: company/organization name if mentioned
+
+Rules:
+- Only extract real people (names that look like attendees, speakers, organizers). Skip generic labels, "TBD", placeholders.
+- Names must have at least 2 characters. Skip entries like "John D." if no full last name.
+- If only one name is given (e.g. "Sarah"), use it as lastName and set firstName to empty string.
+- Normalize company names (strip "Inc.", "LLC" suffixes for consistency is optional - keep as-is).
+- Deduplicate: if the same person appears multiple times, include once.
+
+Respond in JSON: { "attendees": [ { "firstName": "...", "lastName": "...", "title": "..." or null, "company": "..." or null } ] }`;
+
+  const prompt = eventName
+    ? `Event: ${eventName}\n\nContent (may be truncated):\n${text.slice(0, 80000)}`
+    : `Content (event website, attendee list, prospectus - may be truncated):\n${text.slice(0, 80000)}`;
+
+  const result = await generate({ userId, system, prompt, json: true, temperature: 0.2 });
+  try {
+    const parsed = JSON.parse(result) as { attendees?: Partial<EventAttendee>[] };
+    const attendees = Array.isArray(parsed.attendees) ? parsed.attendees : [];
+    return attendees
+      .filter((a) => a.lastName && String(a.lastName).trim().length >= 2)
+      .map((a) => {
+        const last = String(a.lastName || "").trim();
+        const first = String(a.firstName || "").trim();
+        return {
+          firstName: first || last[0] || "?",
+          lastName: last,
+          title: a.title ? String(a.title).trim() || null : null,
+          company: a.company ? String(a.company).trim() || null : null,
+        };
+      })
+      .filter((a) => a.lastName.length >= 2);
+  } catch {
+    return [];
+  }
+}
+
 interface DocumentIntelEntry {
   type: string;
   summary: string;

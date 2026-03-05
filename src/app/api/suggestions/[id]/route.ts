@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 import { suggestionActionSchema, parseRequestBody } from "@/lib/validation";
+import { findOrCreateCompany } from "@/lib/company-utils";
 
 export async function PUT(
   request: NextRequest,
@@ -36,13 +37,25 @@ export async function PUT(
     }
 
     if (action === "approve") {
+      let companyId: string | null = null;
+      let companyName: string | null = suggestion.company;
+
+      if (suggestion.company?.trim()) {
+        const company = await findOrCreateCompany(userId, suggestion.company.trim());
+        if (company) {
+          companyId = company.id;
+          companyName = company.name;
+        }
+      }
+
       const prospect = await prisma.prospect.create({
         data: {
           userId,
           firstName: suggestion.firstName,
           lastName: suggestion.lastName,
           title: suggestion.title,
-          company: suggestion.company,
+          company: companyName,
+          companyId,
           linkedinUrl: suggestion.linkedinUrl,
         },
       });

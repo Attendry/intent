@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import {
@@ -16,6 +17,10 @@ import {
   Inbox,
   Building2,
   Briefcase,
+  Link2,
+  FileText,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 interface Suggestion {
@@ -36,6 +41,11 @@ export default function SuggestionsPage() {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<Set<string>>(new Set());
+  const [importExpanded, setImportExpanded] = useState(false);
+  const [importUrl, setImportUrl] = useState("");
+  const [importText, setImportText] = useState("");
+  const [importEventName, setImportEventName] = useState("");
+  const [importing, setImporting] = useState(false);
   const { toast } = useToast();
 
   const fetchSuggestions = useCallback(async () => {
@@ -95,6 +105,88 @@ export default function SuggestionsPage() {
     }
   };
 
+  const handleImport = async (file?: File) => {
+    const url = importUrl.trim() || undefined;
+    const text = importText.trim().length >= 50 ? importText.trim() : undefined;
+    const eventName = importEventName.trim() || undefined;
+
+    if (file) {
+      if (file.size < 50) {
+        toast("File too small (min 50 bytes)", "error");
+        return;
+      }
+      setImporting(true);
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        if (eventName) formData.append("eventName", eventName);
+        const res = await fetch("/api/event-attendees/import", {
+          method: "POST",
+          body: formData,
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Import failed");
+        toast(data.message || `${data.created} prospect(s) added for review`, "success");
+        if (data.created > 0) {
+          setImportEventName("");
+          fetchSuggestions();
+        }
+      } catch (e) {
+        toast(e instanceof Error ? e.message : "Import failed", "error");
+      } finally {
+        setImporting(false);
+      }
+      return;
+    }
+
+    if (!url && !text) {
+      toast("Enter a URL, paste content (min 50 chars), or upload a file", "error");
+      return;
+    }
+    setImporting(true);
+    try {
+      const res = await fetch("/api/event-attendees/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: url || undefined,
+          text: text || undefined,
+          eventName: eventName || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Import failed");
+      toast(data.message || `${data.created} prospect(s) added for review`, "success");
+      if (data.created > 0) {
+        setImportUrl("");
+        setImportText("");
+        setImportEventName("");
+        fetchSuggestions();
+      }
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Import failed", "error");
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.name.toLowerCase().endsWith(".pdf")) {
+      handleImport(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const text = String(reader.result ?? "");
+        if (text.length >= 50) setImportText(text);
+        else toast("File content too short (min 50 chars)", "error");
+      };
+      reader.readAsText(file);
+    }
+    e.target.value = "";
+  };
+
   return (
     <div className="mx-auto max-w-3xl animate-fade-in">
       <div className="mb-8 flex items-center justify-between">
@@ -130,6 +222,103 @@ export default function SuggestionsPage() {
           </div>
         )}
       </div>
+
+      <Card className="mb-8 overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setImportExpanded((x) => !x)}
+          className="flex w-full items-center justify-between p-4 text-left hover:bg-muted/50 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <FileText className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium">Import event attendees</span>
+            <span className="text-xs text-muted-foreground">
+              From URL or document
+            </span>
+          </div>
+          {importExpanded ? (
+            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          )}
+        </button>
+        {importExpanded && (
+          <div className="border-t border-border p-4 space-y-4">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+                Event URL
+              </label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="https://event-website.com/attendees"
+                  value={importUrl}
+                  onChange={(e) => setImportUrl(e.target.value)}
+                  className="flex-1"
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Paste a URL to an event page, attendee list, or speaker list. HTML and PDF supported.
+              </p>
+            </div>
+            <div className="relative">
+              <div className="absolute left-0 right-0 top-0 h-px bg-border" />
+              <span className="relative -top-2.5 left-0 bg-card px-1 text-[10px] text-muted-foreground uppercase tracking-wider">
+                or paste / upload
+              </span>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+                Document content
+              </label>
+              <textarea
+                placeholder="Paste attendee list, speaker list, or event prospectus..."
+                value={importText}
+                onChange={(e) => setImportText(e.target.value)}
+                rows={4}
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+              <div className="flex items-center gap-2 mt-1.5">
+                <label className="cursor-pointer">
+                  <span className="text-[11px] text-primary hover:underline">
+                    Upload .txt or .pdf
+                  </span>
+                  <input
+                    type="file"
+                    accept=".txt,.pdf"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                </label>
+                <span className="text-[11px] text-muted-foreground">
+                  — PDFs are sent directly for extraction
+                </span>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+                Event name (optional)
+              </label>
+              <Input
+                placeholder="e.g. SaaStr Annual 2025"
+                value={importEventName}
+                onChange={(e) => setImportEventName(e.target.value)}
+              />
+            </div>
+            <Button
+              onClick={() => handleImport()}
+              disabled={importing || (!importUrl.trim() && importText.trim().length < 50)}
+              className="gap-2"
+            >
+              {importing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Link2 className="h-4 w-4" />
+              )}
+              Extract attendees
+            </Button>
+          </div>
+        )}
+      </Card>
 
       {loading ? (
         <div className="flex flex-col items-center justify-center py-24 text-muted-foreground">
