@@ -38,6 +38,22 @@ export const DRAFT_TEMPLATE_USE_CASES = [
   { value: "event_based", label: "Event-based" },
 ] as const;
 
+export const SOCIAL_CONTENT_TYPES = [
+  { value: "thought_leadership", label: "Thought leadership", promotional: false },
+  { value: "story", label: "Story", promotional: false },
+  { value: "question", label: "Question", promotional: false },
+  { value: "numbers", label: "Numbers", promotional: false },
+  { value: "event_takeaway", label: "Event takeaway", promotional: false },
+  { value: "soft_promo", label: "Soft promo", promotional: true },
+] as const;
+
+export const SERIES_ARCS = [
+  { value: "problem_insight_cta", label: "Problem → Insight → CTA" },
+  { value: "story_arc", label: "Story arc" },
+  { value: "tips", label: "Tips" },
+  { value: "debate", label: "Debate" },
+] as const;
+
 export const INTEL_TYPE_COLORS: Record<string, string> = {
   company_news: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
   conference: "bg-purple-500/10 text-purple-600 dark:text-purple-400",

@@ -26,6 +26,7 @@ import {
   X,
   Trash2,
   Phone as PhoneIcon,
+  Share2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select } from "@/components/ui/select";
@@ -483,6 +484,12 @@ export default function CompanyDetailPage() {
             <PhoneIcon className="h-3.5 w-3.5" />
             Prep for call
           </Button>
+          <Link href={`/social-posts?companyId=${id}`}>
+            <Button variant="outline" size="sm" className="gap-1.5" title="Create LinkedIn post for this account">
+              <Share2 className="h-3.5 w-3.5" />
+              Post about account
+            </Button>
+          </Link>
           <Link href={`/companies/${id}/account`}>
             <Button variant="outline" size="sm" className="gap-1.5">
               <Users className="h-3.5 w-3.5" />

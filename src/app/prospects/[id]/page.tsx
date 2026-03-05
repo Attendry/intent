@@ -41,6 +41,7 @@ import {
   Languages,
   CheckCircle2,
   Video,
+  Share2,
 } from "lucide-react";
 
 interface CompanyContext {
@@ -933,6 +934,12 @@ export default function ProspectDetailPage() {
                   <Linkedin className="h-3.5 w-3.5" />
                   LinkedIn Draft
                 </Button>
+                <Link href={`/social-posts?prospectId=${prospect.id}`}>
+                  <Button variant="outline" size="sm" className="gap-1.5" title="Create LinkedIn post for this persona">
+                    <Share2 className="h-3.5 w-3.5" />
+                    Create post
+                  </Button>
+                </Link>
                 <Button onClick={() => setShowLogOutreach(!showLogOutreach)} variant="outline" size="sm" className="gap-1.5">
                   <Send className="h-3.5 w-3.5" />
                   Log Outreach

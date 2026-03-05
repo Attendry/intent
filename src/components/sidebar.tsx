@@ -6,7 +6,7 @@ import { useState } from "react";
 import {
   LayoutDashboard, Users, UserPlus, Building2, FileText,
   BarChart3, Settings, Sparkles, Briefcase, Target,
-  Menu, X, Bookmark, Columns3,
+  Menu, X, Bookmark, Columns3, Share2,
 } from "lucide-react";
 
 
@@ -90,6 +90,7 @@ export default function Sidebar() {
           <div className="my-2 h-px bg-white/10" />
           {[
             { href: "/content", label: "Content", icon: FileText },
+            { href: "/social-posts", label: "Social Posts", icon: Share2 },
             { href: "/findings", label: "Findings", icon: Bookmark },
             { href: "/my-company", label: "My Company", icon: Briefcase },
             { href: "/fit-overview", label: "Fit Overview", icon: Target },

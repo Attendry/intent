@@ -154,6 +154,34 @@ export const enrichSchema = z.object({
   message: "prospectId, prospectIds, or content is required",
 });
 
+export const socialPostGenerateSchema = z.object({
+  targetType: z.enum(["account", "persona"]),
+  targetId: z.string().optional(),
+  personaDesc: z.string().optional(),
+  signalId: z.string().optional(),
+  intelId: z.string().optional(),
+  voice: z.enum(["formal", "informal"]).default("informal"),
+  antiAI: z.boolean().default(true),
+  contentType: z.enum([
+    "thought_leadership", "story", "question", "numbers", "event_takeaway", "soft_promo"
+  ]),
+  includeHashtags: z.boolean().default(true),
+  series: z.boolean().default(false),
+  seriesCount: z.number().int().min(3).max(5).optional(),
+  seriesArc: z.enum(["problem_insight_cta", "story_arc", "tips", "debate"]).optional(),
+  language: z.string().default("en"),
+});
+
+export const socialPostRedraftSchema = z.object({
+  originalPost: z.string().min(1),
+  instruction: z.string().min(1),
+  targetType: z.enum(["account", "persona"]).optional(),
+  targetId: z.string().optional(),
+  personaDesc: z.string().optional(),
+  voice: z.enum(["formal", "informal"]).optional(),
+  language: z.string().optional(),
+});
+
 export const voiceExampleSchema = z.object({
   language: z.string().default("en"),
   originalDraft: z.string().min(1),

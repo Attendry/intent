@@ -21,6 +21,7 @@ import {
   UserPlus,
   RefreshCw,
   Lightbulb,
+  Share2,
 } from "lucide-react";
 import { getInitials, timeAgo, formatDate } from "@/lib/format";
 
@@ -262,6 +263,15 @@ export default function QueueCard({ item, onDismiss, onSnooze, onReviewSend }: Q
             <Send className="h-3.5 w-3.5" />
             {queueType === "suggested" ? "Reach Out" : "Review & Send"}
           </Button>
+          <Link
+            href={`/social-posts?prospectId=${prospect.id}${signal ? `&signalId=${signal.id}` : ""}`}
+            className="inline-flex"
+          >
+            <Button variant="outline" size="sm" className="gap-1.5" title="Create social post">
+              <Share2 className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Post</span>
+            </Button>
+          </Link>
 
           {queueType !== "suggested" && (
             <>

@@ -1004,3 +1004,339 @@ Body: ${params.body ? params.body.slice(0, 2000) : "N/A"}`;
     return { summary: "", tags: [], personaFit: [], useCaseFit: [] };
   }
 }
+
+// Social-specific banned phrases (add to base list for social posts; avoid duplicates)
+const SOCIAL_BANNED_PHRASES = [
+  "In today's world",
+  "delve into",
+  "Happy Monday",
+  "I'm excited to announce",
+  "In conclusion",
+];
+
+const SOCIAL_DRAFTING_PHILOSOPHY = `You are a senior social selling writer creating LinkedIn posts for B2B sales professionals. Your posts must be:
+- Hook in first 140 characters (LinkedIn truncates; 60-70% of readers are lost at "See more")
+- 400-1,600 characters optimal; never exceed 2,000
+- Use line breaks every 1-2 sentences — walls of text kill engagement
+- Lead with value, insight, or a provocative question — not product pitches
+- Ask questions or take bold positions to spark comments
+- Avoid corporate buzzwords and generic openings
+
+BANNED PHRASES (never use):
+${[...BANNED_PHRASES, ...SOCIAL_BANNED_PHRASES].map((p) => `- "${p}"`).join("\n")}
+
+Hook killers to avoid: "Happy Monday, LinkedIn!", "I'm excited to announce...", vague teases, hashtag-first openings.
+Hook winners: specific numbers, relatable pain points, bold claims backed by data, surprising stats, provocative questions.`;
+
+export interface GenerateSocialPostParams {
+  userId: string;
+  targetType: "account" | "persona";
+  targetId?: string;
+  personaDesc?: string;
+  voice: "formal" | "informal";
+  antiAI: boolean;
+  contentType: string;
+  signalId?: string;
+  intelId?: string;
+  includeHashtags?: boolean;
+  language?: string;
+  settings: SettingsData;
+  voiceExamples?: { originalDraft: string; revisedDraft: string }[];
+  content?: Content[];
+}
+
+export async function generateSocialPost(params: GenerateSocialPostParams): Promise<{ body: string }> {
+  const {
+    userId,
+    targetType,
+    targetId,
+    personaDesc,
+    voice,
+    antiAI,
+    contentType,
+    signalId,
+    intelId,
+    includeHashtags = true,
+    language = "en",
+    settings,
+    voiceExamples,
+    content = [],
+  } = params;
+
+  const senderName = settings.senderName || settings.userName || "the user";
+  const senderTitle = settings.senderTitle || settings.userTitle || "Sales";
+  const senderCompany = settings.senderCompany || settings.userCompany || "our company";
+
+  let targetContext = "";
+  let triggerContext = "";
+
+  if (targetType === "account" && targetId) {
+    const company = await prisma.company.findFirst({
+      where: { id: targetId, userId },
+      include: { intel: { orderBy: { createdAt: "desc" }, take: 5 } },
+    });
+    if (company) {
+      targetContext = `Account: ${company.name}
+Industry: ${company.industry || "N/A"}
+Size: ${company.size || "N/A"}
+Fit: ${company.fitBucket || "N/A"}
+Role briefing: ${company.roleBriefingCache || "N/A"}
+Fit analysis: ${company.fitAnalysis || "N/A"}`;
+
+      if (intelId) {
+        const intel = company.intel.find((i) => i.id === intelId) || await prisma.companyIntel.findFirst({ where: { id: intelId, companyId: targetId } });
+        if (intel) {
+          triggerContext = `Trigger (CompanyIntel): ${intel.type}
+Summary: ${intel.summary}
+Action context: ${intel.actionContext || "N/A"}`;
+        }
+      }
+    }
+  } else if (targetType === "persona") {
+    if (targetId) {
+      const prospect = await prisma.prospect.findFirst({
+        where: { id: targetId, userId },
+        include: { signals: { orderBy: { createdAt: "desc" }, take: 10 } },
+      });
+      if (prospect) {
+        targetContext = `Persona: ${prospect.firstName} ${prospect.lastName}
+Title: ${prospect.title || "N/A"}
+Company: ${prospect.company || "N/A"}
+Industry: ${prospect.industry || "N/A"}
+Persona summary: ${prospect.personaSummary || "N/A"}
+Role archetype: ${prospect.roleArchetype || "general"}`;
+
+        if (signalId) {
+          const signal = prospect.signals.find((s) => s.id === signalId) || await prisma.signal.findFirst({ where: { id: signalId, prospectId: targetId } });
+          if (signal) {
+            triggerContext = `Trigger (Signal): ${signal.type}
+Summary: ${signal.summary || signal.rawContent || "N/A"}
+Outreach angle: ${signal.outreachAngle || "N/A"}`;
+          }
+        }
+      }
+    } else if (personaDesc) {
+      targetContext = `Persona (described): ${personaDesc}`;
+    }
+  }
+
+  const contentContext = content.length
+    ? `\nAvailable content to reference:\n${content.map((c) => `- "${c.title}" (${c.type}): ${c.summary || c.url || ""}`).join("\n")}`
+    : "";
+
+  const voiceContext = voiceExamples && voiceExamples.length > 0
+    ? `\nMatch this writing style (before → after examples):\n${voiceExamples.map((v) => `Before: ${v.originalDraft}\nAfter: ${v.revisedDraft}`).join("\n\n")}`
+    : "";
+
+  const langInstructions = language === "de" ? `
+When writing in German:
+- Use formal "Sie" address for formal voice, "Du" for informal
+- Keep the tone professional yet warm for DACH business culture
+- Adapt idioms naturally, do not translate English expressions literally` : "";
+
+  const antiAIContext = antiAI
+    ? `
+CRITICAL - Make it sound human:
+- Use contractions. Vary sentence length — mix short punchy lines with longer ones.
+- Occasional sentence fragments are fine.
+- Avoid corporate buzzwords. Write like a real person posting from their phone, not a marketing team.
+- Include at least one specific detail (number, example, or concrete scenario).`
+    : "";
+
+  const voiceContext2 = voice === "formal"
+    ? "Tone: Formal, professional, structured."
+    : "Tone: Informal, casual, first-person, relatable.";
+
+  const hashtagContext = includeHashtags
+    ? "Add 2-4 relevant, industry-specific hashtags at the end. No hashtag-first openings."
+    : "Do not include hashtags.";
+
+  const contentTypeGuidance: Record<string, string> = {
+    thought_leadership: "Industry insight, POV, trend take. Lead with a bold claim or surprising stat.",
+    story: "Personal anecdote, lesson learned, relatable moment. Tell a short story.",
+    question: "Provocative question to spark comments. Open with the question.",
+    numbers: "Surprising stat, poll result, data point. Lead with the number.",
+    event_takeaway: "Conference/event reflection, key takeaway. Share what you learned.",
+    soft_promo: "What you do, who you help — subtle CTA. Use sparingly (~20% of posts).",
+  };
+
+  const contentTypeGuide = contentTypeGuidance[contentType] || contentTypeGuidance.thought_leadership;
+
+  const system = `${SOCIAL_DRAFTING_PHILOSOPHY}${langInstructions}
+
+You are writing on behalf of ${senderName}, ${senderTitle} at ${senderCompany}.
+
+Content type: ${contentType}. ${contentTypeGuide}
+${voiceContext2}${antiAIContext}
+${hashtagContext}
+Language: ${language === "de" ? "German" : "English"}${voiceContext}
+
+Respond in JSON format: { "body": "..." }
+The body must be the full LinkedIn post text. Use line breaks for readability.`;
+
+  const prompt = `Write a LinkedIn post for social selling.
+
+Target context:
+${targetContext || "General B2B audience (no specific account/persona)"}
+${triggerContext ? `\n${triggerContext}` : ""}
+${contentContext}`;
+
+  const temperature = antiAI ? 0.85 : 0.7;
+  const text = await generate({ userId, system, prompt, json: true, temperature });
+  try {
+    const parsed = JSON.parse(text) as { body?: string };
+    return { body: parsed.body || text };
+  } catch {
+    return { body: text };
+  }
+}
+
+export interface GenerateSocialSeriesParams extends GenerateSocialPostParams {
+  count: number;
+  seriesArc: "problem_insight_cta" | "story_arc" | "tips" | "debate";
+}
+
+const SERIES_ARC_GUIDANCE: Record<string, string> = {
+  problem_insight_cta: "Part 1: Problem/pain. Part 2: Insight/lesson. Part 3: Soft CTA or question. Each post stands alone.",
+  story_arc: "Part 1: Setup. Part 2: Conflict/lesson. Part 3: Resolution/takeaway. Each post stands alone.",
+  tips: "One tip per post. Each post is standalone. No 'As I said in my last post...'",
+  debate: "Part 1: Bold claim. Part 2: Counterpoint. Part 3: Synthesis or 'What do you think?' Each post stands alone.",
+};
+
+export async function generateSocialSeries(params: GenerateSocialSeriesParams): Promise<{ posts: { body: string; theme: string; partLabel?: string }[] }> {
+  const { count, seriesArc, ...singleParams } = params;
+  const arcGuide = SERIES_ARC_GUIDANCE[seriesArc] || SERIES_ARC_GUIDANCE.problem_insight_cta;
+  const partLabels = ["Part 1", "Part 2", "Part 3", "Part 4", "Part 5"];
+
+  const { userId, targetType, targetId, personaDesc, voice, antiAI, signalId, intelId, includeHashtags = true, language = "en", settings, voiceExamples } = params;
+
+  const senderName = settings.senderName || settings.userName || "the user";
+  const senderTitle = settings.senderTitle || settings.userTitle || "Sales";
+  const senderCompany = settings.senderCompany || settings.userCompany || "our company";
+
+  let targetContext = "";
+  let triggerContext = "";
+
+  if (targetType === "account" && targetId) {
+    const company = await prisma.company.findFirst({
+      where: { id: targetId, userId },
+      include: { intel: { orderBy: { createdAt: "desc" }, take: 5 } },
+    });
+    if (company) {
+      targetContext = `Account: ${company.name}\nIndustry: ${company.industry || "N/A"}\nRole briefing: ${company.roleBriefingCache || "N/A"}`;
+      if (intelId) {
+        const intel = company.intel.find((i) => i.id === intelId) || await prisma.companyIntel.findFirst({ where: { id: intelId, companyId: targetId } });
+        if (intel) triggerContext = `Trigger: ${intel.type} - ${intel.summary}`;
+      }
+    }
+  } else if (targetType === "persona" && targetId) {
+    const prospect = await prisma.prospect.findFirst({
+      where: { id: targetId, userId },
+      include: { signals: { orderBy: { createdAt: "desc" }, take: 10 } },
+    });
+    if (prospect) {
+      targetContext = `Persona: ${prospect.firstName} ${prospect.lastName}, ${prospect.title} at ${prospect.company}\nSummary: ${prospect.personaSummary || "N/A"}`;
+      if (signalId) {
+        const signal = prospect.signals.find((s) => s.id === signalId) || await prisma.signal.findFirst({ where: { id: signalId, prospectId: targetId } });
+        if (signal) triggerContext = `Trigger: ${signal.type} - ${signal.summary || signal.rawContent || "N/A"}`;
+      }
+    }
+  } else if (personaDesc) {
+    targetContext = `Persona: ${personaDesc}`;
+  }
+
+  const voiceContext = voiceExamples && voiceExamples.length > 0
+    ? `\nMatch this style:\n${voiceExamples.map((v) => `Before: ${v.originalDraft}\nAfter: ${v.revisedDraft}`).join("\n\n")}`
+    : "";
+
+  const system = `${SOCIAL_DRAFTING_PHILOSOPHY}
+
+You are writing a SERIES of ${count} LinkedIn posts for ${senderName}, ${senderTitle} at ${senderCompany}.
+Series arc: ${seriesArc}. ${arcGuide}
+${voice === "formal" ? "Tone: Formal, professional." : "Tone: Informal, casual, first-person."}
+${params.antiAI ? "Make it sound human. Use contractions, varied sentence length." : ""}
+${includeHashtags ? "Add 2-4 hashtags at end of each post." : ""}
+Language: ${language === "de" ? "German" : "English"}${voiceContext}
+
+Respond in JSON: { "posts": [ { "body": "...", "theme": "...", "partLabel": "Part 1" }, ... ] }
+Each post must be 400-1600 chars. Hook ≤140 chars. Standalone.`;
+
+  const prompt = `Create ${count} LinkedIn posts in a ${seriesArc} series.
+
+Target: ${targetContext || "General B2B audience"}
+${triggerContext ? `\n${triggerContext}` : ""}`;
+
+  const text = await generate({
+    userId,
+    system,
+    prompt,
+    json: true,
+    temperature: params.antiAI ? 0.85 : 0.7,
+  });
+
+  try {
+    const parsed = JSON.parse(text) as { posts?: { body: string; theme?: string; partLabel?: string }[] };
+    const postsResult = parsed.posts || [];
+    if (postsResult.length > 0) {
+      return { posts: postsResult.map((p) => ({ body: p.body, theme: p.theme || `${seriesArc} series`, partLabel: p.partLabel })) };
+    }
+  } catch {
+    // fallback: single post
+  }
+
+  // Fallback: generate posts one by one
+  const fallbackPosts: { body: string; theme: string; partLabel?: string }[] = [];
+  for (let i = 0; i < count; i++) {
+    const r = await generateSocialPost(singleParams);
+    fallbackPosts.push({
+      body: r.body,
+      theme: `${seriesArc} series`,
+      partLabel: partLabels[i],
+    });
+  }
+  return { posts: fallbackPosts };
+}
+
+export interface GenerateSocialRedraftParams {
+  userId: string;
+  originalPost: string;
+  instruction: string;
+  targetType?: "account" | "persona";
+  targetId?: string;
+  personaDesc?: string;
+  voice?: "formal" | "informal";
+  language?: string;
+  settings: SettingsData;
+  voiceExamples?: { originalDraft: string; revisedDraft: string }[];
+}
+
+export async function generateSocialRedraft(params: GenerateSocialRedraftParams): Promise<{ body: string }> {
+  const { userId, originalPost, instruction, voice = "informal", language = "en", settings, voiceExamples } = params;
+
+  const voiceContext = voiceExamples && voiceExamples.length > 0
+    ? `\nMatch this style:\n${voiceExamples.map((v) => `Before: ${v.originalDraft}\nAfter: ${v.revisedDraft}`).join("\n\n")}`
+    : "";
+
+  const system = `${SOCIAL_DRAFTING_PHILOSOPHY}
+
+You are revising a LinkedIn post. Apply the user's revision instructions while maintaining:
+- Hook ≤140 chars, 400-1,600 chars total
+- Line breaks for readability
+- ${voice === "formal" ? "Formal, professional tone." : "Informal, casual tone."}
+Language: ${language === "de" ? "German" : "English"}${voiceContext}
+
+Respond in JSON: { "body": "..." }`;
+
+  const prompt = `Original post:
+${originalPost}
+
+Revision instruction: ${instruction}`;
+
+  const text = await generate({ userId, system, prompt, json: true, temperature: 0.8 });
+  try {
+    const parsed = JSON.parse(text) as { body?: string };
+    return { body: parsed.body || text };
+  } catch {
+    return { body: text };
+  }
+}
