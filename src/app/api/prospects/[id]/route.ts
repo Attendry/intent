@@ -12,6 +12,7 @@ export async function GET(
       include: {
         signals: { orderBy: { createdAt: "desc" } },
         outreach: { orderBy: { createdAt: "desc" } },
+        meetingLogs: { orderBy: { createdAt: "desc" } },
       },
     });
 
@@ -46,7 +47,7 @@ export async function PUT(
       "firstName", "lastName", "email", "phone", "mobilePhone", "title", "company",
       "companyId", "roleArchetype", "industry", "linkedinUrl", "personaSummary", "personaTags",
       "backgroundNotes", "priorityTier", "starred", "preferredLang",
-      "lastContactedAt", "nextFollowUpAt",
+      "lastContactedAt", "nextFollowUpAt", "pipelineStage",
     ] as const;
 
     const data: Record<string, unknown> = {};

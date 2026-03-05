@@ -465,7 +465,15 @@ export default function CompanyDetailPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <Breadcrumbs items={[{ label: "Companies", href: "/companies" }, { label: company.name }]} />
+      <div className="flex items-center justify-between">
+        <Breadcrumbs items={[{ label: "Companies", href: "/companies" }, { label: company.name }]} />
+        <Link href={`/companies/${id}/account`}>
+          <Button variant="outline" size="sm" className="gap-1.5">
+            <Users className="h-3.5 w-3.5" />
+            Account View
+          </Button>
+        </Link>
+      </div>
 
       {/* Metadata Card */}
       <div className="rounded-xl border border-border bg-card p-6 shadow-soft">

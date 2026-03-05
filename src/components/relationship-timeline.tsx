@@ -13,6 +13,7 @@ import {
   Users,
   Calendar,
   Lock,
+  Video,
 } from "lucide-react";
 
 interface TimelineSignal {
@@ -34,16 +35,28 @@ interface TimelineOutreach {
   createdAt: string;
 }
 
+interface TimelineMeeting {
+  id: string;
+  notes: string | null;
+  summary: string | null;
+  outcome: string | null;
+  meetingDate: string | null;
+  suggestedStage: string | null;
+  createdAt: string;
+}
+
 interface RelationshipTimelineProps {
   signals: TimelineSignal[];
   outreach: TimelineOutreach[];
+  meetings?: TimelineMeeting[];
   redactedSignalIds?: Set<string>;
   onTogglePrivate?: (signalId: string, isPrivate: boolean) => void;
 }
 
 type TimelineEntry =
   | { kind: "signal"; date: Date; data: TimelineSignal }
-  | { kind: "outreach"; date: Date; data: TimelineOutreach };
+  | { kind: "outreach"; date: Date; data: TimelineOutreach }
+  | { kind: "meeting"; date: Date; data: TimelineMeeting };
 
 const SIGNAL_TYPE_LABELS: Record<string, string> = {
   linkedin_post: "LinkedIn Post",
@@ -102,6 +115,7 @@ function formatDate(dateStr: string) {
 export default function RelationshipTimeline({
   signals,
   outreach,
+  meetings = [],
   redactedSignalIds,
   onTogglePrivate,
 }: RelationshipTimelineProps) {
@@ -120,6 +134,14 @@ export default function RelationshipTimeline({
           kind: "outreach",
           date: new Date(o.createdAt),
           data: o,
+        }) as const
+    ),
+    ...meetings.map(
+      (m) =>
+        ({
+          kind: "meeting",
+          date: new Date(m.meetingDate || m.createdAt),
+          data: m,
         }) as const
     ),
   ].sort((a, b) => b.date.getTime() - a.date.getTime());
@@ -202,6 +224,40 @@ export default function RelationshipTimeline({
                     >
                       View source
                     </a>
+                  )}
+                </div>
+              </div>
+            );
+          }
+
+          if (entry.kind === "meeting") {
+            const m = entry.data;
+            return (
+              <div key={`meeting-${m.id}`} className="relative flex gap-4 py-3 animate-slide-up" style={{ animationDelay: `${i * 50}ms`, animationFillMode: "both" }}>
+                <div className="relative z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-500 text-white shadow-soft">
+                  <Video className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1 rounded-xl border border-border/60 bg-card p-4 shadow-soft transition-shadow hover:shadow-elevated">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <span className="font-medium">{formatDate(m.createdAt)}</span>
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                      Meeting
+                    </Badge>
+                    {m.outcome && (
+                      <span className="rounded-lg px-2 py-0.5 text-[10px] font-semibold bg-muted">
+                        {m.outcome}
+                      </span>
+                    )}
+                  </div>
+                  {(m.summary || m.notes) && (
+                    <p className="mt-1.5 text-sm text-foreground leading-relaxed line-clamp-3">
+                      {m.summary || m.notes}
+                    </p>
+                  )}
+                  {m.suggestedStage && (
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      Suggested stage: {m.suggestedStage}
+                    </p>
                   )}
                 </div>
               </div>

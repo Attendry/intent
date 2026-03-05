@@ -363,6 +363,49 @@ function formatStructuredPrep(p: StructuredPrepBriefing): string {
   return parts.join("\n\n");
 }
 
+export interface MeetingSummaryResult {
+  summary: string;
+  actionItems: string[];
+  suggestedStage: string | null;
+}
+
+const PIPELINE_STAGES = ["new", "meeting_booked", "qualified", "proposal", "negotiation", "closed_won", "closed_lost"];
+
+export async function generateMeetingSummary(
+  userId: string,
+  notes: string,
+  prospectContext: { firstName: string; lastName: string; company?: string | null; title?: string | null }
+): Promise<MeetingSummaryResult> {
+  const system = `You are a B2B sales meeting analyst. Given raw meeting notes, produce:
+1. summary: 2-4 sentence executive summary of the meeting
+2. actionItems: array of strings, each a clear next step (owner optional, e.g. "Send proposal by Friday" or "Rep: Schedule demo with IT")
+3. suggestedStage: one of ${PIPELINE_STAGES.join(", ")} — the pipeline stage that best fits the meeting outcome. Use "qualified" if discovery went well, "proposal" if next step is proposal, "negotiation" if in pricing/discounts, "closed_won"/"closed_lost" if deal closed. Use null if unclear.
+
+Respond in JSON: { "summary": "...", "actionItems": ["...", "..."], "suggestedStage": "..." or null }`;
+
+  const prompt = `Prospect: ${prospectContext.firstName} ${prospectContext.lastName}
+${prospectContext.title ? `Title: ${prospectContext.title}` : ""}
+${prospectContext.company ? `Company: ${prospectContext.company}` : ""}
+
+Meeting notes:
+${notes}`;
+
+  const result = await generate({ userId, system, prompt, json: true, temperature: 0.4 });
+  try {
+    const parsed = JSON.parse(result) as Partial<MeetingSummaryResult>;
+    const stage = parsed.suggestedStage && PIPELINE_STAGES.includes(parsed.suggestedStage)
+      ? parsed.suggestedStage
+      : null;
+    return {
+      summary: parsed.summary || "",
+      actionItems: Array.isArray(parsed.actionItems) ? parsed.actionItems : [],
+      suggestedStage: stage,
+    };
+  } catch {
+    return { summary: "", actionItems: [], suggestedStage: null };
+  }
+}
+
 interface DocumentIntelEntry {
   type: string;
   summary: string;

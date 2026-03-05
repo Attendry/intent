@@ -39,6 +39,7 @@ import {
   Send,
   Languages,
   CheckCircle2,
+  Video,
 } from "lucide-react";
 
 interface CompanyContext {
@@ -72,10 +73,12 @@ interface ProspectDetail {
   preferredLang: string;
   lastContactedAt: string | null;
   nextFollowUpAt: string | null;
+  pipelineStage: string | null;
   createdAt: string;
   updatedAt: string;
   signals: SignalData[];
   outreach: OutreachData[];
+  meetingLogs?: MeetingData[];
 }
 
 interface SignalData {
@@ -95,6 +98,16 @@ interface OutreachData {
   messageSent: string | null;
   subjectLine: string | null;
   outcome: string;
+  createdAt: string;
+}
+
+interface MeetingData {
+  id: string;
+  notes: string | null;
+  summary: string | null;
+  outcome: string | null;
+  meetingDate: string | null;
+  suggestedStage: string | null;
   createdAt: string;
 }
 
@@ -138,6 +151,23 @@ export default function ProspectDetailPage() {
   const [showLogOutreach, setShowLogOutreach] = useState(false);
   const [outreachForm, setOutreachForm] = useState({ channel: "email", outcome: "sent", subjectLine: "", messageSent: "", notes: "" });
   const [loggingOutreach, setLoggingOutreach] = useState(false);
+  const [showLogMeeting, setShowLogMeeting] = useState(false);
+  const [meetingForm, setMeetingForm] = useState({ notes: "", meetingDate: "", outcome: "positive" });
+  const [loggingMeeting, setLoggingMeeting] = useState(false);
+  const [meetingResult, setMeetingResult] = useState<{ suggestedStage: string | null } | null>(null);
+  const [updatingStage, setUpdatingStage] = useState(false);
+  const [showLogMeetingPrompt, setShowLogMeetingPrompt] = useState(false);
+
+  const PIPELINE_STAGES = ["new", "meeting_booked", "qualified", "proposal", "negotiation", "closed_won", "closed_lost"] as const;
+  const STAGE_LABELS: Record<string, string> = {
+    new: "New",
+    meeting_booked: "Meeting Booked",
+    qualified: "Qualified",
+    proposal: "Proposal",
+    negotiation: "Negotiation",
+    closed_won: "Won",
+    closed_lost: "Lost",
+  };
 
   const fetchProspect = useCallback(async () => {
     setLoading(true);
@@ -286,6 +316,26 @@ export default function ProspectDetailPage() {
     setDraftChannel(channel);
   };
 
+  const handlePipelineStageChange = async (newStage: string) => {
+    if (!prospect) return;
+    setUpdatingStage(true);
+    try {
+      const res = await fetch(`/api/prospects/${prospect.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pipelineStage: newStage || null }),
+      });
+      if (!res.ok) throw new Error("Failed to update");
+      const updated = await res.json();
+      setProspect((prev) => (prev ? { ...prev, pipelineStage: updated.pipelineStage } : prev));
+      toast("Stage updated", "success");
+    } catch {
+      toast("Failed to update stage", "error");
+    } finally {
+      setUpdatingStage(false);
+    }
+  };
+
   const handleLogOutreach = async () => {
     if (!prospect) return;
     setLoggingOutreach(true);
@@ -307,10 +357,69 @@ export default function ProspectDetailPage() {
       setShowLogOutreach(false);
       fetchProspect();
       toast("Outreach logged", "success");
+      if (outreachForm.outcome === "meeting_booked") {
+        setShowLogMeetingPrompt(true);
+      }
     } catch {
       toast("Failed to log outreach", "error");
     } finally {
       setLoggingOutreach(false);
+    }
+  };
+
+  const handleLogMeeting = async () => {
+    if (!prospect) return;
+    setLoggingMeeting(true);
+    setMeetingResult(null);
+    try {
+      const res = await fetch("/api/meeting-log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prospectId: prospect.id,
+          notes: meetingForm.notes || null,
+          meetingDate: meetingForm.meetingDate || null,
+          outcome: meetingForm.outcome,
+          runAi: true,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to log meeting");
+      const data = await res.json();
+      setMeetingForm({ notes: "", meetingDate: "", outcome: "positive" });
+      setMeetingResult({ suggestedStage: data.suggestedStage });
+      fetchProspect();
+      toast("Meeting logged", "success");
+      if (!data.suggestedStage) {
+        setShowLogMeeting(false);
+        setShowLogMeetingPrompt(false);
+      }
+    } catch {
+      toast("Failed to log meeting", "error");
+    } finally {
+      setLoggingMeeting(false);
+    }
+  };
+
+  const handleApplySuggestedStage = async () => {
+    if (!prospect || !meetingResult?.suggestedStage) return;
+    setUpdatingStage(true);
+    try {
+      const res = await fetch(`/api/prospects/${prospect.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pipelineStage: meetingResult.suggestedStage }),
+      });
+      if (!res.ok) throw new Error("Failed to update");
+      const updated = await res.json();
+      setProspect((prev) => (prev ? { ...prev, pipelineStage: updated.pipelineStage } : prev));
+      setMeetingResult(null);
+      setShowLogMeeting(false);
+      setShowLogMeetingPrompt(false);
+      toast("Stage updated", "success");
+    } catch {
+      toast("Failed to update stage", "error");
+    } finally {
+      setUpdatingStage(false);
     }
   };
 
@@ -795,6 +904,19 @@ export default function ProspectDetailPage() {
             {/* Right: stats + actions */}
             <div className="flex flex-col items-end gap-4">
               <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-right">
+                <div>
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70 mb-1">Pipeline stage</p>
+                  <Select
+                    value={prospect.pipelineStage || "new"}
+                    onChange={(e) => handlePipelineStageChange(e.target.value)}
+                    disabled={updatingStage}
+                    className="h-8 w-full min-w-[140px] text-xs font-medium"
+                  >
+                    {PIPELINE_STAGES.map((s) => (
+                      <option key={s} value={s}>{STAGE_LABELS[s] || s}</option>
+                    ))}
+                  </Select>
+                </div>
                 {[
                   { label: "Last contacted", value: formatDate(prospect.lastContactedAt) },
                   { label: "Next follow-up", value: formatDate(prospect.nextFollowUpAt) },
@@ -824,6 +946,10 @@ export default function ProspectDetailPage() {
                 <Button onClick={() => setShowLogOutreach(!showLogOutreach)} variant="outline" size="sm" className="gap-1.5">
                   <Send className="h-3.5 w-3.5" />
                   Log Outreach
+                </Button>
+                <Button onClick={() => { setShowLogMeeting(true); setShowLogMeetingPrompt(false); }} variant="outline" size="sm" className="gap-1.5">
+                  <Video className="h-3.5 w-3.5" />
+                  Log Meeting
                 </Button>
                 {!editing && (
                   <Button
@@ -1033,6 +1159,96 @@ export default function ProspectDetailPage() {
         </Card>
       )}
 
+      {/* Log meeting now? prompt (after meeting_booked) */}
+      {showLogMeetingPrompt && !showLogMeeting && (
+        <div className="mb-6 rounded-xl border border-primary/30 bg-primary/5 p-4 flex items-center justify-between gap-4">
+          <p className="text-sm font-medium text-foreground">
+            Log meeting notes now while context is fresh?
+          </p>
+          <div className="flex gap-2 shrink-0">
+            <Button size="sm" onClick={() => { setShowLogMeeting(true); setShowLogMeetingPrompt(false); }}>
+              Yes
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setShowLogMeetingPrompt(false)}>
+              Later
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Log Meeting Form */}
+      {showLogMeeting && (
+        <Card className="mb-6">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Video className="h-4 w-4 text-primary" />
+              Log Meeting
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">Notes (paste or type)</label>
+                <Textarea
+                  value={meetingForm.notes}
+                  onChange={(e) => setMeetingForm({ ...meetingForm, notes: e.target.value })}
+                  placeholder="Paste meeting notes, key points, outcomes..."
+                  rows={4}
+                />
+              </div>
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="mb-1 block text-xs font-medium text-muted-foreground">Meeting date (optional)</label>
+                  <Input
+                    type="date"
+                    value={meetingForm.meetingDate}
+                    onChange={(e) => setMeetingForm({ ...meetingForm, meetingDate: e.target.value })}
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="mb-1 block text-xs font-medium text-muted-foreground">Outcome</label>
+                  <Select
+                    value={meetingForm.outcome}
+                    onChange={(e) => setMeetingForm({ ...meetingForm, outcome: e.target.value })}
+                    className="w-full rounded-lg h-9 px-3 py-2 text-sm"
+                  >
+                    <option value="positive">Positive</option>
+                    <option value="negative">Needs follow-up</option>
+                    <option value="next_steps">No progress</option>
+                  </Select>
+                </div>
+              </div>
+              {meetingResult?.suggestedStage && (
+                <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 flex items-center justify-between gap-3">
+                  <p className="text-sm font-medium">
+                    Suggested: move to <span className="font-bold">{STAGE_LABELS[meetingResult.suggestedStage] || meetingResult.suggestedStage}</span>
+                  </p>
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={handleApplySuggestedStage} disabled={updatingStage}>
+                      {updatingStage ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Apply"}
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => { setMeetingResult(null); setShowLogMeeting(false); setShowLogMeetingPrompt(false); }}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {!meetingResult && (
+                <div className="flex gap-2 pt-1">
+                  <Button size="sm" onClick={handleLogMeeting} disabled={loggingMeeting} className="gap-1.5">
+                    {loggingMeeting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                    Log & Summarize
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => { setShowLogMeeting(false); setShowLogMeetingPrompt(false); setMeetingResult(null); }}>
+                    Cancel
+                  </Button>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Timeline */}
       <div className="mb-6">
         <div className="mb-5 flex items-center justify-between">
@@ -1121,6 +1337,15 @@ export default function ProspectDetailPage() {
             subjectLine: o.subjectLine,
             outcome: o.outcome,
             createdAt: o.createdAt,
+          }))}
+          meetings={prospect.meetingLogs?.map((m) => ({
+            id: m.id,
+            notes: m.notes,
+            summary: m.summary,
+            outcome: m.outcome,
+            meetingDate: m.meetingDate,
+            suggestedStage: m.suggestedStage,
+            createdAt: m.createdAt,
           }))}
           onTogglePrivate={handleTogglePrivate}
         />

@@ -30,7 +30,7 @@ interface MentionItem {
 }
 
 interface ChatContext {
-  type: "prospect" | "company" | "general";
+  type: "prospect" | "company" | "general" | "pipeline" | "account";
   id?: string;
   label?: string;
 }
@@ -43,6 +43,8 @@ const PROSPECT_STARTERS = [
   "Handle 'need to talk to my boss' objection",
   "Handle 'timing isn't right' objection",
   "Prep me for a call",
+  "Summarize meeting notes",
+  "Post-call next steps",
   "Draft a follow-up email",
   "What content should I share?",
   "Discovery questions for this persona",
@@ -67,7 +69,30 @@ const GENERAL_STARTERS = [
   "Discovery questions for [persona type]",
 ];
 
+const PIPELINE_STARTERS = [
+  "Deals at risk?",
+  "What's my forecast?",
+  "Which stage needs attention?",
+  "Summarize pipeline",
+];
+
+const ACCOUNT_STARTERS = [
+  "Who should I talk to next?",
+  "Coverage gaps?",
+  "Next-best-action per contact",
+  "Account strategy",
+];
+
 function parseContext(pathname: string): ChatContext {
+  // /pipeline
+  if (pathname === "/pipeline") {
+    return { type: "pipeline" };
+  }
+  // /companies/[id]/account
+  const accountMatch = pathname.match(/^\/companies\/([^/]+)\/account/);
+  if (accountMatch) {
+    return { type: "account", id: accountMatch[1] };
+  }
   // /prospects/[id] or /prospects/[id]/...
   const prospectMatch = pathname.match(/^\/prospects\/([^/]+)/);
   if (prospectMatch) {
@@ -274,15 +299,17 @@ export default function ChatAssistant() {
         });
       } else {
         setContext(newCtx);
-        setContextLabel("General");
+        const label = newCtx.type === "pipeline" ? "Pipeline" : "General";
+        setContextLabel(label);
         if (
           messages.length > 0 &&
           (prevContextRef.current.startsWith("prospect:") ||
-          prevContextRef.current.startsWith("company:"))
+          prevContextRef.current.startsWith("company:") ||
+          prevContextRef.current === "account:")
         ) {
           setMessages((prev) => [
             ...prev,
-            { role: "divider", content: "General" },
+            { role: "divider", content: label },
           ]);
         }
         setShowStarters(true);
@@ -297,7 +324,7 @@ export default function ChatAssistant() {
         });
       } else {
         setContext(newCtx);
-        setContextLabel("General");
+        setContextLabel(newCtx.type === "pipeline" ? "Pipeline" : "General");
       }
     }
 
@@ -306,19 +333,22 @@ export default function ChatAssistant() {
 
   async function fetchContextLabel(ctx: ChatContext): Promise<string> {
     try {
+      if (ctx.type === "pipeline") return "Pipeline";
       if (ctx.type === "prospect" && ctx.id) {
         const res = await fetch(`/api/prospects/${ctx.id}`);
         if (!res.ok) return "Prospect";
         const data = await res.json();
         if (data.firstName)
           return `${data.firstName} ${data.lastName}${data.company ? `, ${data.company}` : ""}`;
-      } else if (ctx.type === "company" && ctx.id) {
+      } else if ((ctx.type === "company" || ctx.type === "account") && ctx.id) {
         const res = await fetch(`/api/companies/${ctx.id}`);
-        if (!res.ok) return "Company";
+        if (!res.ok) return ctx.type === "account" ? "Account" : "Company";
         const data = await res.json();
-        if (data.name) return data.name;
+        if (data.name) return ctx.type === "account" ? `Account: ${data.name}` : data.name;
       }
     } catch { /* */ }
+    if (ctx.type === "pipeline") return "Pipeline";
+    if (ctx.type === "account") return "Account";
     return ctx.type === "prospect" ? "Prospect" : "Company";
   }
 

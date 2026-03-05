@@ -66,6 +66,7 @@ model Prospect {
   companyRef    Company?         @relation(fields: [companyId], references: [id])
   signals       Signal[]
   outreach      OutreachLog[]
+  meetingLogs   MeetingLog[]
   savedFindings SavedFinding[]
 
   @@unique([userId, email])
@@ -117,6 +118,25 @@ model OutreachLog {
   prospect Prospect @relation(fields: [prospectId], references: [id], onDelete: Cascade)
 
   @@index([prospectId])
+  @@index([createdAt])
+}
+
+model MeetingLog {
+  id             String    @id @default(cuid())
+  prospectId     String
+  userId         String
+  notes          String?
+  summary        String?
+  actionItems    String?   // JSON array of { text, owner?, due? }
+  suggestedStage String?
+  outcome        String?   // positive, negative, next_steps, etc.
+  meetingDate    DateTime?
+  createdAt      DateTime  @default(now())
+
+  prospect Prospect @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+
+  @@index([prospectId])
+  @@index([userId])
   @@index([createdAt])
 }
 

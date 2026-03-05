@@ -6,7 +6,7 @@ import { useState } from "react";
 import {
   LayoutDashboard, Users, UserPlus, Building2, FileText,
   BarChart3, Settings, Sparkles, Briefcase, Target,
-  Menu, X, Bookmark,
+  Menu, X, Bookmark, Columns3,
 } from "lucide-react";
 
 
@@ -56,6 +56,7 @@ export default function Sidebar() {
         <nav className="flex flex-1 flex-col gap-0.5 px-2.5 pt-2">
           {[
             { href: "/", label: "Home", icon: LayoutDashboard },
+            { href: "/pipeline", label: "Pipeline", icon: Columns3 },
             { href: "/prospects", label: "Prospects", icon: Users },
             { href: "/companies", label: "Companies", icon: Building2 },
             { href: "/suggestions", label: "Suggestions", icon: UserPlus },

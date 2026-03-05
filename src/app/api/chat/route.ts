@@ -4,7 +4,7 @@ import { getAIClient, getSettingsForUser } from "@/lib/ai";
 import { requireAuth } from "@/lib/auth";
 
 interface ChatContext {
-  type: "prospect" | "company" | "general";
+  type: "prospect" | "company" | "general" | "pipeline" | "account";
   id?: string;
 }
 
@@ -134,6 +134,10 @@ async function loadProspectContext(userId: string, prospectId: string): Promise<
         orderBy: { createdAt: "desc" },
         take: 10,
       },
+      meetingLogs: {
+        orderBy: { createdAt: "desc" },
+        take: 5,
+      },
     },
   });
 
@@ -145,6 +149,7 @@ async function loadProspectContext(userId: string, prospectId: string): Promise<
   if (prospect.company) parts.push(`Company: ${prospect.company}`);
   if (prospect.industry) parts.push(`Industry: ${prospect.industry}`);
   if (prospect.roleArchetype) parts.push(`Role type: ${prospect.roleArchetype}`);
+  parts.push(`Pipeline stage: ${prospect.pipelineStage || "new"}`);
   if (prospect.personaSummary)
     parts.push(`Persona: ${prospect.personaSummary}`);
   if (prospect.personaTags) {
@@ -174,6 +179,15 @@ async function loadProspectContext(userId: string, prospectId: string): Promise<
     for (const o of prospect.outreach) {
       parts.push(
         `- ${new Date(o.createdAt).toLocaleDateString()} via ${o.channel}: ${o.outcome || "no outcome"}${o.notes ? ` (${o.notes})` : ""}`
+      );
+    }
+  }
+
+  if (prospect.meetingLogs && prospect.meetingLogs.length > 0) {
+    parts.push("\nMEETING LOGS:");
+    for (const m of prospect.meetingLogs) {
+      parts.push(
+        `- ${new Date(m.createdAt).toLocaleDateString()}: ${m.summary || m.notes || "Meeting"}${m.suggestedStage ? ` (suggested stage: ${m.suggestedStage})` : ""}`
       );
     }
   }
@@ -291,6 +305,7 @@ async function loadCompanyContext(userId: string, companyId: string): Promise<st
           roleArchetype: true,
           personaSummary: true,
           lastContactedAt: true,
+          pipelineStage: true,
           signals: {
             where: { actedOn: false, dismissed: false },
             take: 3,
@@ -349,8 +364,93 @@ async function loadCompanyContext(userId: string, companyId: string): Promise<st
         .map((s) => `[${s.type}] ${s.summary || ""}`)
         .join("; ");
       parts.push(
-        `- ${p.firstName} ${p.lastName}, ${p.title || "?"} (${p.roleArchetype || "?"})${p.lastContactedAt ? ` — last contact: ${new Date(p.lastContactedAt).toLocaleDateString()}` : ""}${signals ? ` — signals: ${signals}` : ""}`
+        `- ${p.firstName} ${p.lastName}, ${p.title || "?"} (${p.roleArchetype || "?"}) — stage: ${p.pipelineStage || "new"}${p.lastContactedAt ? ` — last contact: ${new Date(p.lastContactedAt).toLocaleDateString()}` : ""}${signals ? ` — signals: ${signals}` : ""}`
       );
+    }
+  }
+
+  return parts.join("\n");
+}
+
+async function loadPipelineContext(userId: string): Promise<string> {
+  const prospects = await prisma.prospect.findMany({
+    where: { userId },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      company: true,
+      pipelineStage: true,
+      lastContactedAt: true,
+    },
+    orderBy: { lastContactedAt: "desc" },
+  });
+
+  const byStage: Record<string, number> = {};
+  for (const p of prospects) {
+    const stage = p.pipelineStage || "new";
+    byStage[stage] = (byStage[stage] || 0) + 1;
+  }
+
+  const parts: string[] = [];
+  parts.push(`PIPELINE SUMMARY: ${prospects.length} total prospects`);
+  parts.push(`Counts by stage: ${JSON.stringify(byStage)}`);
+  parts.push("\nPROSPECTS BY STAGE:");
+  for (const p of prospects.slice(0, 30)) {
+    const stage = p.pipelineStage || "new";
+    parts.push(
+      `- ${p.firstName} ${p.lastName} (${p.company || "?"}) — ${stage} — last contact: ${p.lastContactedAt ? new Date(p.lastContactedAt).toLocaleDateString() : "never"}`
+    );
+  }
+  return parts.join("\n");
+}
+
+async function loadAccountContext(userId: string, companyId: string): Promise<string> {
+  const base = await loadCompanyContext(userId, companyId);
+
+  const company = await prisma.company.findFirst({
+    where: { id: companyId, userId },
+    include: {
+      prospects: {
+        include: {
+          outreach: { orderBy: { createdAt: "desc" }, take: 3 },
+          meetingLogs: { orderBy: { createdAt: "desc" }, take: 2 },
+        },
+      },
+    },
+  });
+
+  if (!company) return base;
+
+  const findings = await prisma.savedFinding.findMany({
+    where: {
+      OR: [
+        { companyId: companyId },
+        { prospect: { companyId } },
+      ],
+    },
+    orderBy: { createdAt: "desc" },
+    take: 5,
+  });
+
+  const parts: string[] = [base];
+
+  parts.push("\n\nACCOUNT-SPECIFIC (meetings & outreach):");
+  for (const p of company.prospects) {
+    const hasMeeting = p.meetingLogs.length > 0 || p.outreach.some((o) => o.outcome === "meeting_booked");
+    if (hasMeeting) {
+      const lastMeeting = p.meetingLogs[0];
+      const meetingBooked = p.outreach.find((o) => o.outcome === "meeting_booked");
+      parts.push(
+        `- ${p.firstName} ${p.lastName}: ${lastMeeting?.summary || (meetingBooked ? "Meeting booked" : "Has outreach")}`
+      );
+    }
+  }
+
+  if (findings.length > 0) {
+    parts.push("\nFINDINGS:");
+    for (const f of findings) {
+      parts.push(`- ${f.content.slice(0, 200)}${f.content.length > 200 ? "..." : ""}`);
     }
   }
 
@@ -383,6 +483,9 @@ SALES METHODOLOGY:
 - Call/meeting prep: structure as Objective, Key Discovery Questions, Anticipated Objections with Responses, Concrete Next Steps
 - Competitive positioning: focus on differentiation and unique value, never disparage competitors
 - Always end with a specific, actionable next step
+- Pipeline: When discussing pipeline, reference stages (new, meeting_booked, qualified, proposal, negotiation, closed_won, closed_lost). Suggest stage moves when appropriate.
+- Meetings: When prospect has meeting logs, use summaries and action items for post-call prep and next steps.
+- Account: When in account context, consider buying committee coverage, pipeline stage per contact, and recommend next-best-action.
 
 ${contentLibrary ? `CONTENT LIBRARY (recommend relevant pieces when appropriate):\n${contentLibrary}\n` : ""}
 LIVE RESEARCH:
@@ -431,12 +534,17 @@ export async function POST(request: NextRequest) {
     const loadedIds = new Set<string>();
     const contextParts: string[] = [];
 
-    // Page context (prospect or company)
+    // Page context (prospect, company, pipeline, account)
     if (context?.type === "prospect" && context.id) {
       contextParts.push(await loadProspectContext(userId, context.id));
       loadedIds.add(`prospect:${context.id}`);
     } else if (context?.type === "company" && context.id) {
       contextParts.push(await loadCompanyContext(userId, context.id));
+      loadedIds.add(`company:${context.id}`);
+    } else if (context?.type === "pipeline") {
+      contextParts.push(await loadPipelineContext(userId));
+    } else if (context?.type === "account" && context.id) {
+      contextParts.push(await loadAccountContext(userId, context.id));
       loadedIds.add(`company:${context.id}`);
     }
 
