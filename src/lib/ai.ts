@@ -483,11 +483,21 @@ Rules:
 
 Respond in JSON: { "attendees": [ { "firstName": "...", "lastName": "...", "title": "..." or null, "company": "..." or null } ] }`;
 
+  // Limit to ~30k chars to stay under Gemini request size limits
+  const maxChars = 30000;
+  const truncated = text.slice(0, maxChars);
+
   const prompt = eventName
-    ? `Event: ${eventName}\n\nContent (may be truncated):\n${text.slice(0, 80000)}`
-    : `Content (event website, attendee list, prospectus - may be truncated):\n${text.slice(0, 80000)}`;
+    ? `Event: ${eventName}\n\nContent (may be truncated):\n${truncated}`
+    : `Content (event website, attendee list, prospectus - may be truncated):\n${truncated}`;
 
   const result = await generate({ userId, system, prompt, json: true, temperature: 0.2 });
+  const trimmed = result.trim();
+  if (!trimmed.startsWith("{")) {
+    throw new Error(
+      `AI returned non-JSON. ${trimmed.slice(0, 150)}${trimmed.length > 150 ? "…" : ""}`
+    );
+  }
   try {
     const parsed = JSON.parse(result) as { attendees?: Partial<EventAttendee>[] };
     const attendees = Array.isArray(parsed.attendees) ? parsed.attendees : [];
@@ -504,8 +514,13 @@ Respond in JSON: { "attendees": [ { "firstName": "...", "lastName": "...", "titl
         };
       })
       .filter((a) => a.lastName.length >= 2);
-  } catch {
-    return [];
+  } catch (err) {
+    if (err instanceof SyntaxError) {
+      throw new Error(
+        `AI response was not valid JSON. The document may be too large or the content format may not be supported.`
+      );
+    }
+    throw err;
   }
 }
 

@@ -31,10 +31,10 @@ export async function POST(request: NextRequest) {
       const file = formData.get("file") as File | null;
       eventName = (formData.get("eventName") as string)?.trim() || undefined;
       if (file && file.size > 0) {
-        const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5MB
+        const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10MB
         if (file.size > MAX_FILE_BYTES) {
           return NextResponse.json(
-            { error: "File too large (max 5MB)" },
+            { error: "File too large (max 10MB)" },
             { status: 400 }
           );
         }
@@ -98,7 +98,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const attendees = await extractEventAttendees(userId, rawText, eventName || null);
+    let attendees: Awaited<ReturnType<typeof extractEventAttendees>>;
+    try {
+      attendees = await extractEventAttendees(userId, rawText, eventName || null);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "AI extraction failed";
+      return NextResponse.json({ error: msg }, { status: 400 });
+    }
     if (attendees.length === 0) {
       return NextResponse.json({
         success: true,
