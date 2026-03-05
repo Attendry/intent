@@ -119,8 +119,6 @@ export default function HomePage() {
 
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
 
-    toast("Signal dismissed. Click here to undo.", "info");
-
     const timer = setTimeout(async () => {
       try {
         await fetch(`/api/signals/${signalId}`, {
@@ -138,15 +136,20 @@ export default function HomePage() {
 
     undoTimerRef.current = timer;
 
-    // Store undo data in a way the toast can access it
-    (window as unknown as Record<string, unknown>).__undoDismiss = () => {
-      clearTimeout(timer);
-      if (dismissedItem) {
-        setItems((prev) => [...prev, dismissedItem]);
-        toast("Dismiss undone", "success");
-      }
-      delete (window as unknown as Record<string, unknown>).__undoDismiss;
-    };
+    toast("Signal dismissed.", "info", {
+      action: {
+        label: "Undo",
+        onClick: (dismiss) => {
+          clearTimeout(timer);
+          undoTimerRef.current = null;
+          if (dismissedItem) {
+            setItems((prev) => [...prev, dismissedItem]);
+            toast("Dismiss undone", "success");
+          }
+          dismiss();
+        },
+      },
+    });
   };
 
   const handleSnooze = async (signalId: string, until: string) => {

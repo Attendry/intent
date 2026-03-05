@@ -2,6 +2,15 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import {
+  DndContext,
+  DragEndEvent,
+  useDraggable,
+  useDroppable,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select } from "@/components/ui/select";
@@ -12,9 +21,9 @@ import {
   ChevronRight,
   Building2,
   User,
-  AlertTriangle,
   Target,
   Calendar,
+  GripVertical,
 } from "lucide-react";
 import { formatLastContacted } from "@/lib/format";
 import { useToast } from "@/components/ui/toast";
@@ -130,6 +139,23 @@ export default function PipelinePage() {
     );
   }
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const prospectId = String(active.id);
+    const newStage = String(over.id);
+    const prospect = Object.values(data.byStage).flat().find((p) => p.id === prospectId);
+    if (prospect && prospect.pipelineStage !== newStage) {
+      handleStageChange(prospectId, newStage);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-7xl animate-fade-in">
       <div className="mb-6">
@@ -139,20 +165,13 @@ export default function PipelinePage() {
         </p>
       </div>
 
-      {/* Active stages */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-        {data.activeStages.map((stageKey) => {
-          const prospects = data.byStage[stageKey] || [];
-          return (
-            <div
-              key={stageKey}
-              className="rounded-xl border border-border bg-card overflow-hidden"
-            >
-              <div className="flex items-center justify-between p-3 bg-muted/30 border-b border-border">
-                <h2 className="text-sm font-semibold">{STAGE_LABELS[stageKey] || stageKey}</h2>
-                <Badge variant="outline">{prospects.length}</Badge>
-              </div>
-              <div className="p-2 space-y-2 min-h-[120px]">
+      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+        {/* Active stages */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          {data.activeStages.map((stageKey) => {
+            const prospects = data.byStage[stageKey] || [];
+            return (
+              <DroppableColumn key={stageKey} id={stageKey} label={STAGE_LABELS[stageKey] || stageKey} count={prospects.length}>
                 {prospects.length === 0 ? (
                   <p className="text-xs text-muted-foreground text-center py-6">None</p>
                 ) : (
@@ -166,11 +185,10 @@ export default function PipelinePage() {
                     />
                   ))
                 )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+              </DroppableColumn>
+            );
+          })}
+        </div>
 
       {/* Closed stages (collapsed) */}
       <div className="mt-6 rounded-xl border border-border">
@@ -192,34 +210,87 @@ export default function PipelinePage() {
           <Badge variant="outline">{closedTotal}</Badge>
         </button>
         {!closedCollapsed && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 mt-0">
             {data.closedStages.map((stageKey) => {
               const prospects = data.byStage[stageKey] || [];
               return (
-                <div key={stageKey} className="rounded-lg border border-border/50 bg-card p-3">
-                  <h3 className="text-xs font-semibold text-muted-foreground mb-2">
-                    {STAGE_LABELS[stageKey] || stageKey}
-                  </h3>
-                  <div className="space-y-2">
-                    {prospects.length === 0 ? (
-                      <p className="text-xs text-muted-foreground">None</p>
-                    ) : (
-                      prospects.map((p) => (
-                        <PipelineCard
-                          key={p.id}
-                          prospect={p}
-                          onStageChange={handleStageChange}
-                          updating={updatingId === p.id}
-                          stages={data.activeStages.concat(data.closedStages)}
-                        />
-                      ))
-                    )}
-                  </div>
-                </div>
+                <DroppableClosedColumn key={stageKey} id={stageKey} label={STAGE_LABELS[stageKey] || stageKey}>
+                  {prospects.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">None</p>
+                  ) : (
+                    prospects.map((p) => (
+                      <PipelineCard
+                        key={p.id}
+                        prospect={p}
+                        onStageChange={handleStageChange}
+                        updating={updatingId === p.id}
+                        stages={data.activeStages.concat(data.closedStages)}
+                      />
+                    ))
+                  )}
+                </DroppableClosedColumn>
               );
             })}
           </div>
         )}
+      </div>
+    </DndContext>
+    </div>
+  );
+}
+
+function DroppableClosedColumn({
+  id,
+  label,
+  children,
+}: {
+  id: string;
+  label: string;
+  children: React.ReactNode;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "rounded-lg border border-border/50 bg-card p-3 transition-colors",
+        isOver && "ring-2 ring-primary/20 bg-primary/5"
+      )}
+    >
+      <h3 className="text-xs font-semibold text-muted-foreground mb-2">{label}</h3>
+      <div className="space-y-2 min-h-[80px]">{children}</div>
+    </div>
+  );
+}
+
+function DroppableColumn({
+  id,
+  label,
+  count,
+  children,
+}: {
+  id: string;
+  label: string;
+  count: number;
+  children: React.ReactNode;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "rounded-xl border border-border bg-card overflow-hidden transition-colors",
+        isOver && "ring-2 ring-primary/20 bg-primary/5"
+      )}
+    >
+      <div className="flex items-center justify-between p-3 bg-muted/30 border-b border-border">
+        <h2 className="text-sm font-semibold">{label}</h2>
+        <Badge variant="outline">{count}</Badge>
+      </div>
+      <div className="p-2 space-y-2 min-h-[120px]">
+        {children}
       </div>
     </div>
   );
@@ -236,14 +307,27 @@ function PipelineCard({
   updating: boolean;
   stages: readonly string[];
 }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: prospect.id,
+  });
+
   return (
     <div
+      ref={setNodeRef}
       className={cn(
         "rounded-lg border border-border/50 bg-background p-4 transition-all hover:border-border",
-        prospect.isStale && "border-amber-200 dark:border-amber-800"
+        prospect.isStale && "border-amber-200 dark:border-amber-800",
+        isDragging && "opacity-50 cursor-grabbing"
       )}
     >
       <div className="flex items-start justify-between gap-2 mb-1.5">
+        <div
+          {...attributes}
+          {...listeners}
+          className="shrink-0 mt-0.5 cursor-grab active:cursor-grabbing rounded p-0.5 text-muted-foreground hover:text-foreground"
+        >
+          <GripVertical className="h-3.5 w-3.5" />
+        </div>
         <Link href={`/prospects/${prospect.id}`} className="min-w-0 flex-1">
           <div className="flex items-center gap-2 min-w-0">
             <User className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />

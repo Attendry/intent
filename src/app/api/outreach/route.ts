@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
 
     const now = new Date();
     const rawOutcome = body.outcome || "no_response";
+    // UI values (sent, replied, interested, etc.) map to internal outcomes for cadence logic
     const outcomeMap: Record<string, "no_response" | "positive" | "negative" | "meeting_booked"> = {
       sent: "no_response", replied: "positive", interested: "positive",
       not_interested: "negative", bounced: "negative",

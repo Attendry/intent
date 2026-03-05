@@ -1,3 +1,10 @@
+/** Meeting outcome labels for Log Meeting form. Use in prospect page, meeting-log API, relationship-timeline. */
+export const MEETING_OUTCOME_LABELS: Record<string, { label: string; title: string }> = {
+  positive: { label: "Positive", title: "Moving forward" },
+  negative: { label: "Needs follow-up", title: "Stalled or blocked" },
+  next_steps: { label: "No progress", title: "No clear next steps" },
+};
+
 export const CONTENT_TYPE_LABELS: Record<string, string> = {
   case_study: "Case Study",
   blog: "Blog",

@@ -2,6 +2,7 @@
 
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { MEETING_OUTCOME_LABELS } from "@/lib/constants";
 import {
   Mail,
   Linkedin,
@@ -245,7 +246,7 @@ export default function RelationshipTimeline({
                     </Badge>
                     {m.outcome && (
                       <span className="rounded-lg px-2 py-0.5 text-[10px] font-semibold bg-muted">
-                        {m.outcome}
+                        {MEETING_OUTCOME_LABELS[m.outcome]?.label ?? m.outcome}
                       </span>
                     )}
                   </div>

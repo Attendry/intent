@@ -7,14 +7,24 @@ import { cn } from "@/lib/utils";
 
 type ToastVariant = "default" | "success" | "error" | "info";
 
+export interface ToastAction {
+  label: string;
+  onClick: (dismiss: () => void) => void;
+}
+
 interface Toast {
   id: string;
   message: string;
   variant: ToastVariant;
+  action?: ToastAction;
+}
+
+export interface ToastOptions {
+  action?: ToastAction;
 }
 
 interface ToastContextValue {
-  toast: (message: string, variant?: ToastVariant) => void;
+  toast: (message: string, variant?: ToastVariant, options?: ToastOptions) => void;
 }
 
 const ToastContext = React.createContext<ToastContextValue>({
@@ -41,9 +51,10 @@ const variantIcons: Record<ToastVariant, React.ElementType> = {
 
 function ToastItem({ toast: t, onDismiss }: { toast: Toast; onDismiss: (id: string) => void }) {
   const Icon = variantIcons[t.variant];
+  const dismiss = () => onDismiss(t.id);
 
   React.useEffect(() => {
-    const timer = setTimeout(() => onDismiss(t.id), 6000);
+    const timer = setTimeout(dismiss, 6000);
     return () => clearTimeout(timer);
   }, [t.id, onDismiss]);
 
@@ -56,8 +67,16 @@ function ToastItem({ toast: t, onDismiss }: { toast: Toast; onDismiss: (id: stri
     >
       <Icon className="h-5 w-5 shrink-0" />
       <p className="flex-1 text-sm font-medium">{t.message}</p>
+      {t.action ? (
+        <button
+          onClick={() => t.action!.onClick(dismiss)}
+          className="shrink-0 text-sm font-semibold text-primary hover:underline"
+        >
+          {t.action.label}
+        </button>
+      ) : null}
       <button
-        onClick={() => onDismiss(t.id)}
+        onClick={dismiss}
         className="shrink-0 rounded-lg p-1 opacity-60 hover:opacity-100 transition-all duration-200"
       >
         <X className="h-4 w-4" />
@@ -74,9 +93,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     setMounted(true);
   }, []);
 
-  const addToast = React.useCallback((message: string, variant: ToastVariant = "default") => {
+  const addToast = React.useCallback((message: string, variant: ToastVariant = "default", options?: ToastOptions) => {
     const id = crypto.randomUUID();
-    setToasts((prev) => [...prev, { id, message, variant }]);
+    setToasts((prev) => [...prev, { id, message, variant, action: options?.action }]);
   }, []);
 
   const dismiss = React.useCallback((id: string) => {

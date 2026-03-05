@@ -14,7 +14,7 @@ import { BrainNudgeCard } from "@/components/brain-nudge-card";
 import { useToast } from "@/components/ui/toast";
 import RelationshipTimeline from "@/components/relationship-timeline";
 import { cn } from "@/lib/utils";
-import { DRAFT_TEMPLATE_USE_CASES } from "@/lib/constants";
+import { DRAFT_TEMPLATE_USE_CASES, MEETING_OUTCOME_LABELS } from "@/lib/constants";
 import {
   ArrowLeft,
   Star,
@@ -1211,9 +1211,9 @@ export default function ProspectDetailPage() {
                     onChange={(e) => setMeetingForm({ ...meetingForm, outcome: e.target.value })}
                     className="w-full rounded-lg h-9 px-3 py-2 text-sm"
                   >
-                    <option value="positive">Positive</option>
-                    <option value="negative">Needs follow-up</option>
-                    <option value="next_steps">No progress</option>
+                    {Object.entries(MEETING_OUTCOME_LABELS).map(([value, { label, title }]) => (
+                      <option key={value} value={value} title={title}>{label}</option>
+                    ))}
                   </Select>
                 </div>
               </div>

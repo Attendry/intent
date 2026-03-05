@@ -541,7 +541,7 @@ function ContentCard({
       </CardContent>
       <CardFooter className="pt-0">
         <span className="text-[11px] font-medium text-muted-foreground/70">
-          Used {item.timesUsed}x this month
+          Used {item.timesUsed}x total
         </span>
       </CardFooter>
     </Card>
