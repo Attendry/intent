@@ -12,8 +12,8 @@ const instrumentSerif = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
-  title: "Intent — Sales Intelligence",
-  description: "B2B sales intelligence and outreach platform",
+  title: "Twobrains — Sales Intelligence",
+  description: "Signal-driven sales intelligence and outreach",
 };
 
 export default function RootLayout({
@@ -26,7 +26,7 @@ export default function RootLayout({
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var d=document.documentElement,s=localStorage.getItem("intent-theme");if(s==="dark"||(!s&&window.matchMedia("(prefers-color-scheme:dark)").matches))d.classList.add("dark")}catch(e){}})()`,
+            __html: `(function(){try{var d=document.documentElement,s=localStorage.getItem("twobrains-theme");if(s==="dark"||(!s&&window.matchMedia("(prefers-color-scheme:dark)").matches))d.classList.add("dark")}catch(e){}})()`,
           }}
         />
       </head>

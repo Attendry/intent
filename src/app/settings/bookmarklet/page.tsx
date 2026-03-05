@@ -8,12 +8,12 @@ import { Bookmark, Copy, Check, ExternalLink, RefreshCw } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 
 const CONTENT_MAX_LEN = 1500;
-const CAPTURE_TOKEN_KEY = "intent_capture_token";
+const CAPTURE_TOKEN_KEY = "twobrains_capture_token";
 
 function getBookmarkletCode(baseUrl: string, token: string) {
   const origin = baseUrl.replace(/\/$/, "");
   const tokenParam = token ? `&token=${encodeURIComponent(token)}` : "";
-  return `javascript:(function(){var u=encodeURIComponent(window.location.href);var t=encodeURIComponent(document.title);var s=window.getSelection().toString().trim();var c=(s||document.body.innerText||'').replace(/\\s+/g,' ').trim().slice(0,${CONTENT_MAX_LEN});window.open('${origin}/capture?url='+u+'&title='+t+(c?'&content='+encodeURIComponent(c):'')+'${tokenParam}','IntentCapture','width=420,height=640,top=100,left=100');})();`;
+  return `javascript:(function(){var u=encodeURIComponent(window.location.href);var t=encodeURIComponent(document.title);var s=window.getSelection().toString().trim();var c=(s||document.body.innerText||'').replace(/\\s+/g,' ').trim().slice(0,${CONTENT_MAX_LEN});window.open('${origin}/capture?url='+u+'&title='+t+(c?'&content='+encodeURIComponent(c):'')+'${tokenParam}','TwobrainsCapture','width=420,height=640,top=100,left=100');})();`;
 }
 
 export default function BookmarkletPage() {
@@ -186,7 +186,7 @@ export default function BookmarkletPage() {
             <li>
               Select the prospect, choose the signal type, add a quick note
             </li>
-            <li>Click Submit — the signal is saved in Intent in 10 seconds</li>
+            <li>Click Submit — the signal is saved in Twobrains in 10 seconds</li>
           </ol>
           <p className="text-muted-foreground">
             The signal will appear in your morning queue, scored and ready for
@@ -207,7 +207,7 @@ export default function BookmarkletPage() {
             <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs text-foreground">
               {baseUrl || "..."}/capture
             </code>
-            . Use the same origin where Intent is running.
+            . Use the same origin where Twobrains is running.
           </p>
           <p>
             • Use the &quot;Open install page&quot; button to install — React blocks

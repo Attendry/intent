@@ -260,7 +260,7 @@ export default function CapturePage() {
               <Sparkles className="h-4 w-4 text-white" />
             </div>
             <span className="text-base font-bold tracking-tight text-sidebar-foreground">
-              Intent
+              Twobrains
             </span>
           </Link>
         </header>
@@ -319,7 +319,7 @@ export default function CapturePage() {
             <Sparkles className="h-4 w-4 text-white" />
           </div>
           <span className="text-base font-bold tracking-tight text-sidebar-foreground">
-            Intent
+            Twobrains
           </span>
         </Link>
         <button

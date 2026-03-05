@@ -69,7 +69,7 @@ export default function LoginPage() {
               <Sparkles className="h-5 w-5 text-white" />
             </div>
             <span className="text-xl font-bold tracking-tight text-foreground">
-              Intent
+              Twobrains
             </span>
           </Link>
           <p className="text-sm text-muted-foreground">

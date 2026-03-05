@@ -42,7 +42,7 @@ export default function Sidebar() {
               <Sparkles className="h-4 w-4 text-white" />
             </div>
             <span className="overflow-hidden whitespace-nowrap text-base font-bold tracking-tight text-sidebar-foreground md:opacity-0 md:transition-opacity md:duration-300 md:group-hover:opacity-100">
-              Intent
+              Twobrains
             </span>
           </div>
           <button

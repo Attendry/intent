@@ -6,14 +6,14 @@ export async function GET(request: NextRequest) {
   const origin = request.nextUrl.origin;
   const token = request.nextUrl.searchParams.get("token") || "";
   const tokenParam = token ? `&token=${encodeURIComponent(token)}` : "";
-  const bookmarkletCode = `javascript:(function(){var u=encodeURIComponent(window.location.href);var t=encodeURIComponent(document.title);var s=window.getSelection().toString().trim();var c=(s||document.body.innerText||'').replace(/\\s+/g,' ').trim().slice(0,${CONTENT_MAX_LEN});window.open('${origin}/capture?url='+u+'&title='+t+(c?'&content='+encodeURIComponent(c):'')+'${tokenParam}','IntentCapture','width=420,height=640,top=100,left=100');})();`;
+  const bookmarkletCode = `javascript:(function(){var u=encodeURIComponent(window.location.href);var t=encodeURIComponent(document.title);var s=window.getSelection().toString().trim();var c=(s||document.body.innerText||'').replace(/\\s+/g,' ').trim().slice(0,${CONTENT_MAX_LEN});window.open('${origin}/capture?url='+u+'&title='+t+(c?'&content='+encodeURIComponent(c):'')+'${tokenParam}','TwobrainsCapture','width=420,height=640,top=100,left=100');})();`;
 
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Intent — Install Bookmarklet</title>
+  <title>Twobrains — Install Bookmarklet</title>
   <style>
     * { box-sizing: border-box; }
     body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 2rem; background: #f5f5f5; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }

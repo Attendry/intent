@@ -17,7 +17,7 @@ export default function LandingPage() {
     setDark((prev) => {
       const next = !prev;
       document.documentElement.classList.toggle("dark", next);
-      localStorage.setItem("intent-theme", next ? "dark" : "light");
+      localStorage.setItem("twobrains-theme", next ? "dark" : "light");
       return next;
     });
   };
@@ -28,14 +28,14 @@ export default function LandingPage() {
       <header className="flex items-center justify-between px-4 py-6 md:px-8 md:py-8">
         <Link
           href="/"
-          aria-label="Intent home"
+          aria-label="Twobrains home"
           className="flex items-center gap-2 transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2 rounded-lg"
         >
           <div className="flex h-9 w-9 items-center justify-center rounded-xl gradient-primary shadow-soft">
             <Sparkles className="h-4 w-4 text-white" />
           </div>
           <span className="text-lg font-bold tracking-tight text-foreground">
-            Intent
+            Twobrains
           </span>
         </Link>
         <div className="flex items-center gap-2">
@@ -64,10 +64,6 @@ export default function LandingPage() {
           >
             Know when to reach out.
           </h1>
-          <p className="mt-6 text-lg text-muted-foreground leading-relaxed max-w-md">
-            B2B sales intelligence that surfaces signals, follow-ups, and
-            outreach angles — so you act at the right time.
-          </p>
           <div className="mt-10 flex flex-col sm:flex-row gap-3">
             <Link href="/auth/signup">
               <Button
@@ -86,14 +82,6 @@ export default function LandingPage() {
                 Sign in
               </Button>
             </Link>
-          </div>
-          <p className="mt-8 text-sm text-muted-foreground">
-            For B2B sales teams
-          </p>
-          <div className="mt-12 pt-8 border-t border-border/60">
-            <p className="text-xs text-muted-foreground/80 tracking-wide uppercase">
-              Signals · Follow-ups · Outreach
-            </p>
           </div>
         </div>
       </main>
