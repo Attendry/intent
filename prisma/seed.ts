@@ -11,9 +11,7 @@
  * Or use a test supabaseId for local dev (won't match real auth):
  *   SEED_SUPABASE_ID=seed-user-1 npx tsx prisma/seed.ts
  */
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { prisma } from "@/lib/db";
 
 async function main() {
   const seedSupabaseId = process.env.SEED_SUPABASE_ID || "seed-dev-user";
