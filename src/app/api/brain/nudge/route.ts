@@ -97,7 +97,7 @@ export async function GET(request: NextRequest) {
         nudges.push({
           text: `New intel: ${recent.summary.slice(0, 100)}${recent.summary.length > 100 ? "..." : ""}`,
           nextBestAction: "Review & reach out",
-          ctaUrl: `/companies/${companyId}`,
+          ctaUrl: `/companies/${companyId}/account`,
         });
       }
     }
