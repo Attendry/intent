@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -128,6 +128,7 @@ function getInitials(first: string, last: string) {
 
 export default function ProspectDetailPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const { toast } = useToast();
 
   const [prospect, setProspect] = useState<ProspectDetail | null>(null);
@@ -154,9 +155,9 @@ export default function ProspectDetailPage() {
   const [outreachForm, setOutreachForm] = useState({ channel: "email", outcome: "sent", subjectLine: "", messageSent: "", notes: "" });
   const [loggingOutreach, setLoggingOutreach] = useState(false);
   const [showLogMeeting, setShowLogMeeting] = useState(false);
-  const [meetingForm, setMeetingForm] = useState({ notes: "", meetingDate: "", outcome: "positive" });
+  const [meetingForm, setMeetingForm] = useState({ notes: "", meetingDate: "", outcome: "positive", extractSignals: true });
   const [loggingMeeting, setLoggingMeeting] = useState(false);
-  const [meetingResult, setMeetingResult] = useState<{ suggestedStage: string | null } | null>(null);
+  const [meetingResult, setMeetingResult] = useState<{ suggestedStage: string | null; signalsCreated?: number } | null>(null);
   const [updatingStage, setUpdatingStage] = useState(false);
   const [showLogMeetingPrompt, setShowLogMeetingPrompt] = useState(false);
 
@@ -383,14 +384,32 @@ export default function ProspectDetailPage() {
           meetingDate: meetingForm.meetingDate || null,
           outcome: meetingForm.outcome,
           runAi: true,
+          extractSignals: meetingForm.extractSignals,
         }),
       });
       if (!res.ok) throw new Error("Failed to log meeting");
       const data = await res.json();
-      setMeetingForm({ notes: "", meetingDate: "", outcome: "positive" });
-      setMeetingResult({ suggestedStage: data.suggestedStage });
+      setMeetingForm({ notes: "", meetingDate: "", outcome: "positive", extractSignals: true });
+      setMeetingResult({ suggestedStage: data.suggestedStage, signalsCreated: data.signalsCreated });
       fetchProspect();
-      toast("Meeting logged", "success");
+      const signalsCount = data.signalsCreated ?? 0;
+      toast(
+        signalsCount > 0
+          ? `Meeting logged. ${signalsCount} follow-up signal${signalsCount === 1 ? "" : "s"} added to your queue.`
+          : "Meeting logged",
+        "success",
+        signalsCount > 0
+          ? {
+              action: {
+                label: "View queue",
+                onClick: (dismiss) => {
+                  dismiss();
+                  router.push("/?filter=signal");
+                },
+              },
+            }
+          : undefined
+      );
       if (!data.suggestedStage) {
         setShowLogMeeting(false);
         setShowLogMeetingPrompt(false);
@@ -1195,6 +1214,18 @@ export default function ProspectDetailPage() {
                   rows={4}
                 />
               </div>
+              <label
+                className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer"
+                title="AI will identify buying signals, objections, and next steps to surface in your queue."
+              >
+                <input
+                  type="checkbox"
+                  checked={meetingForm.extractSignals}
+                  onChange={(e) => setMeetingForm({ ...meetingForm, extractSignals: e.target.checked })}
+                  className="rounded"
+                />
+                Extract follow-up signals from notes
+              </label>
               <div className="flex gap-3">
                 <div className="flex-1">
                   <label className="mb-1 block text-xs font-medium text-muted-foreground">Meeting date (optional)</label>
@@ -1275,6 +1306,9 @@ export default function ProspectDetailPage() {
                 <option value="job_change">Job Change</option>
                 <option value="linkedin_post">LinkedIn Post</option>
                 <option value="hiring">Hiring</option>
+                <option value="funding">Funding</option>
+                <option value="partnership">Partnership</option>
+                <option value="leadership_change">Leadership Change</option>
                 <option value="re_engagement">Re-engagement</option>
                 <option value="other">Other</option>
               </Select>

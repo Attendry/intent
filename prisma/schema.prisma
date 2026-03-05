@@ -312,6 +312,8 @@ model CompanyDocument {
   processingPct   Int       @default(0) // 0-100
   processingError String?
   processedAt     DateTime?
+  lastIntelCreated   Int?    // set when processing completes
+  lastSignalsCreated Int?    // set when processing completes
   createdAt       DateTime  @default(now())
 
   company Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)

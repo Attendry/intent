@@ -87,6 +87,9 @@ interface CompanyDetail {
     processingStage: string | null;
     processingPct: number;
     processingError: string | null;
+    lastIntelCreated?: number | null;
+    lastSignalsCreated?: number | null;
+    processedAt?: string | null;
     createdAt: string;
   }[];
 }
@@ -120,19 +123,46 @@ export default function CompanyDetailPage() {
   const [confirmDeleteDocId, setConfirmDeleteDocId] = useState<string | null>(null);
   const [confirmUnlinkId, setConfirmUnlinkId] = useState<string | null>(null);
   const { toast } = useToast();
+  const prevDocsRef = useRef<{ id: string; status: string }[]>([]);
+  const toastedDocIdsRef = useRef<Set<string>>(new Set());
 
   const fetchCompany = useCallback(async () => {
     try {
       const res = await fetch(`/api/companies/${id}`);
       if (!res.ok) return;
       const data = await res.json();
+      const prevDocs = prevDocsRef.current;
       setCompany(data);
+      // Detect docs that just completed processing and show feedback
+      for (const doc of data.documents || []) {
+        if (doc.status !== "completed") continue;
+        const intel = doc.lastIntelCreated ?? 0;
+        const signals = doc.lastSignalsCreated ?? 0;
+        if (intel === 0 && signals === 0) continue;
+        if (toastedDocIdsRef.current.has(doc.id)) continue;
+        const prev = prevDocs.find((p) => p.id === doc.id);
+        const justCompleted = prev && (prev.status === "processing" || prev.status === "pending");
+        if (justCompleted) {
+          const parts: string[] = [];
+          if (intel > 0) parts.push(`${intel} intel item${intel === 1 ? "" : "s"}`);
+          if (signals > 0) parts.push(`${signals} signal${signals === 1 ? "" : "s"} added to queue`);
+          toast(
+            `Document processed: ${parts.join(", ")}.`,
+            "success"
+          );
+          toastedDocIdsRef.current.add(doc.id);
+        }
+      }
+      prevDocsRef.current = (data.documents || []).map((d: { id: string; status: string }) => ({ id: d.id, status: d.status }));
     } catch { toast("Failed to load company", "error"); } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, toast]);
 
-  useEffect(() => { fetchCompany(); }, [fetchCompany]);
+  useEffect(() => {
+    toastedDocIdsRef.current.clear();
+    fetchCompany();
+  }, [fetchCompany]);
 
   // Auto-poll when documents are processing or synthesis is running
   useEffect(() => {

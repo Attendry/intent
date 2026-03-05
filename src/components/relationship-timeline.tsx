@@ -2,7 +2,7 @@
 
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { MEETING_OUTCOME_LABELS } from "@/lib/constants";
+import { MEETING_OUTCOME_LABELS, SIGNAL_TYPE_LABELS } from "@/lib/constants";
 import {
   Mail,
   Linkedin,
@@ -15,6 +15,16 @@ import {
   Calendar,
   Lock,
   Video,
+  DollarSign,
+  Handshake,
+  UserCog,
+  TrendingUp,
+  Lightbulb,
+  AlertTriangle,
+  Shield,
+  Target,
+  ChevronRight,
+  Clock,
 } from "lucide-react";
 
 interface TimelineSignal {
@@ -59,17 +69,6 @@ type TimelineEntry =
   | { kind: "outreach"; date: Date; data: TimelineOutreach }
   | { kind: "meeting"; date: Date; data: TimelineMeeting };
 
-const SIGNAL_TYPE_LABELS: Record<string, string> = {
-  linkedin_post: "LinkedIn Post",
-  company_news: "Company News",
-  job_change: "Job Change",
-  hiring: "Hiring",
-  conference: "Conference",
-  re_engagement: "Re-engagement",
-  new_prospect: "New Prospect",
-  other: "Other",
-};
-
 const SIGNAL_ICONS: Record<string, typeof Zap> = {
   linkedin_post: Linkedin,
   company_news: Newspaper,
@@ -78,6 +77,18 @@ const SIGNAL_ICONS: Record<string, typeof Zap> = {
   conference: Calendar,
   re_engagement: Zap,
   new_prospect: Zap,
+  funding: DollarSign,
+  partnership: Handshake,
+  leadership_change: UserCog,
+  earnings: TrendingUp,
+  strategy: Lightbulb,
+  risk: AlertTriangle,
+  competitor: Shield,
+  buying_signal: Target,
+  objection: AlertTriangle,
+  next_step: ChevronRight,
+  competitor_mention: Users,
+  timing: Clock,
 };
 
 const CHANNEL_ICONS: Record<string, typeof Mail> = {
@@ -179,7 +190,7 @@ export default function RelationshipTimeline({
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <span className="font-medium">{formatDate(s.createdAt)}</span>
                       <Badge variant="signal" className="text-[10px] px-1.5 py-0">
-                        {SIGNAL_TYPE_LABELS[s.type] || s.type}
+                        {SIGNAL_TYPE_LABELS[s.type] ?? s.type}
                       </Badge>
                     </div>
                     <p className="mt-1.5 text-sm text-muted-foreground italic">Private note</p>
@@ -198,7 +209,7 @@ export default function RelationshipTimeline({
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <span className="font-medium">{formatDate(s.createdAt)}</span>
                     <Badge variant="signal" className="text-[10px] px-1.5 py-0">
-                      {SIGNAL_TYPE_LABELS[s.type] || s.type}
+                      {SIGNAL_TYPE_LABELS[s.type] ?? s.type}
                     </Badge>
                     {s.private && (
                       <button

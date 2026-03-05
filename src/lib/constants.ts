@@ -20,6 +20,29 @@ export const CONTENT_STAGE_LABELS: Record<string, string> = {
   closing: "Closing",
 };
 
+export const SIGNAL_TYPE_LABELS: Record<string, string> = {
+  linkedin_post: "LinkedIn Post",
+  company_news: "Company News",
+  job_change: "Job Change",
+  hiring: "Hiring",
+  conference: "Conference",
+  re_engagement: "Re-engagement",
+  new_prospect: "New Prospect",
+  funding: "Funding",
+  partnership: "Partnership",
+  leadership_change: "Leadership Change",
+  earnings: "Earnings",
+  strategy: "Strategy",
+  risk: "Risk",
+  competitor: "Competitor",
+  buying_signal: "Buying signal",
+  objection: "Objection",
+  next_step: "Next step",
+  competitor_mention: "Competitor",
+  timing: "Timing",
+  other: "Other",
+};
+
 export const INTEL_TYPE_LABELS: Record<string, string> = {
   company_news: "Company News",
   conference: "Conference",

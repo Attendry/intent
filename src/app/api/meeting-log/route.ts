@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
-import { generateMeetingSummary } from "@/lib/ai";
-import { createFragmentFromMeetingLog } from "@/lib/fragment-sync";
+import { generateMeetingSummary, extractMeetingSignals } from "@/lib/ai";
+import { createFragmentFromMeetingLog, createFragmentFromSignal } from "@/lib/fragment-sync";
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,12 +11,13 @@ export async function POST(request: NextRequest) {
     const userId = auth.user.id;
 
     const body = await request.json();
-    const { prospectId, notes, meetingDate, outcome, runAi = true } = body as {
+    const { prospectId, notes, meetingDate, outcome, runAi = true, extractSignals = true } = body as {
       prospectId: string;
       notes?: string;
       meetingDate?: string;
       outcome?: string;
       runAi?: boolean;
+      extractSignals?: boolean;
     };
 
     if (!prospectId) {
@@ -81,9 +82,54 @@ export async function POST(request: NextRequest) {
       outcome: meetingLog.outcome,
     }).catch((e) => console.error("[fragment-sync] meetingLog:", e));
 
+    let signalsCreated = 0;
+    const minUrgency = 3;
+    if (extractSignals !== false && notes?.trim() && notes.trim().length >= 50) {
+      try {
+        const signals = await extractMeetingSignals(userId, notes.trim(), summary);
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        for (const sig of signals) {
+          if (sig.urgencyScore < minUrgency) continue;
+          const existing = await prisma.signal.findFirst({
+            where: {
+              prospectId,
+              summary: sig.summary,
+              actedOn: false,
+              dismissed: false,
+              createdAt: { gte: sevenDaysAgo },
+            },
+          });
+          if (existing) continue;
+          const created = await prisma.signal.create({
+            data: {
+              prospectId,
+              type: sig.type,
+              summary: sig.summary,
+              urgencyScore: sig.urgencyScore,
+              outreachAngle: sig.outreachAngle || null,
+            },
+          });
+          createFragmentFromSignal({
+            id: created.id,
+            prospectId: created.prospectId,
+            type: created.type,
+            summary: created.summary,
+            rawContent: null,
+            urgencyScore: created.urgencyScore,
+            actedOn: created.actedOn,
+            dismissed: created.dismissed,
+          }).catch((e) => console.error("[fragment-sync] signal:", e));
+          signalsCreated++;
+        }
+      } catch (err) {
+        console.error("[meeting-log] extractMeetingSignals error:", err);
+      }
+    }
+
     return NextResponse.json({
       ...meetingLog,
       actionItemsParsed: actionItems ? (JSON.parse(actionItems) as string[]) : [],
+      signalsCreated,
     });
   } catch (error) {
     console.error("POST /api/meeting-log error:", error);

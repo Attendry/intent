@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import QueueCard, { type QueueItemData } from "@/components/queue-card";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
@@ -34,11 +34,19 @@ function getGreeting() {
 }
 
 export default function HomePage() {
+  const searchParams = useSearchParams();
+  const filterParam = searchParams.get("filter") as FilterTab | null;
   const [items, setItems] = useState<QueueItemData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterTab>("all");
   const [sort, setSort] = useState<SortKey>("priority");
+
+  useEffect(() => {
+    if (filterParam && ["all", "signal", "followup", "suggested"].includes(filterParam)) {
+      setFilter(filterParam as FilterTab);
+    }
+  }, [filterParam]);
   const [signalCount, setSignalCount] = useState(0);
   const [followUpCount, setFollowUpCount] = useState(0);
   const [suggestedCount, setSuggestedCount] = useState(0);

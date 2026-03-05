@@ -4,6 +4,10 @@ import { debugLog } from "@/lib/debug";
 import { documentProcessSchema, parseRequestBody } from "@/lib/validation";
 import { extractDocumentIntel } from "@/lib/ai";
 import { createFragmentFromCompanyDocument } from "@/lib/fragment-sync";
+import {
+  createProspectSignalsFromIntel,
+  deriveOutreachAngle,
+} from "@/lib/intel-signals";
 import { readFile } from "fs/promises";
 
 export const maxDuration = 120;
@@ -269,12 +273,33 @@ export async function POST(
       intelCreated++;
     }
 
+    let signalsCreated = 0;
+    for (const entry of extraction.entries) {
+      if ((entry.urgencyScore ?? 3) < 4) continue;
+      const count = await createProspectSignalsFromIntel({
+        companyId,
+        intel: {
+          type: entry.type,
+          summary: entry.summary,
+          sourceUrl: doc.sourceUrl || null,
+          urgencyScore: entry.urgencyScore ?? 3,
+          actionContext: deriveOutreachAngle(entry.type, company.name),
+        },
+      });
+      signalsCreated += count;
+    }
+
     if (intelCreated > 0) {
       await prisma.company.update({
         where: { id: companyId },
         data: { intelCountSinceSynth: { increment: intelCreated } },
       });
     }
+
+    await prisma.companyDocument.update({
+      where: { id: documentId },
+      data: { lastIntelCreated: intelCreated, lastSignalsCreated: signalsCreated },
+    });
 
     debugLog(
       `[doc-process] Complete: ${intelCreated} intel entries saved`
@@ -290,6 +315,7 @@ export async function POST(
       documentId,
       fullSummary: extraction.fullSummary,
       intelCreated,
+      signalsCreated,
     });
   } catch (error) {
     console.error("[doc-process] unexpected error:", error);

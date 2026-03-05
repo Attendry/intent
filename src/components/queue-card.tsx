@@ -19,9 +19,18 @@ import {
   Calendar,
   Briefcase,
   UserPlus,
+  Users,
   RefreshCw,
   Lightbulb,
   Share2,
+  DollarSign,
+  Handshake,
+  UserCog,
+  TrendingUp,
+  AlertTriangle,
+  Shield,
+  Target,
+  ChevronRight,
 } from "lucide-react";
 import { getInitials, timeAgo, formatDate } from "@/lib/format";
 
@@ -88,6 +97,18 @@ const SOURCE_ICONS: Record<string, typeof Linkedin> = {
   conference: Calendar,
   re_engagement: RefreshCw,
   new_prospect: UserPlus,
+  funding: DollarSign,
+  partnership: Handshake,
+  leadership_change: UserCog,
+  earnings: TrendingUp,
+  strategy: Lightbulb,
+  risk: AlertTriangle,
+  competitor: Shield,
+  buying_signal: Target,
+  objection: AlertTriangle,
+  next_step: ChevronRight,
+  competitor_mention: Users,
+  timing: Clock,
 };
 
 function getUrgencyGradient(score: number) {

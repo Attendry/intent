@@ -2,7 +2,11 @@ import { z } from "zod";
 
 export const SignalTypeEnum = z.enum([
   "linkedin_post", "company_news", "job_change", "hiring",
-  "conference", "re_engagement", "new_prospect", "other"
+  "conference", "re_engagement", "new_prospect",
+  "funding", "partnership", "leadership_change", "earnings",
+  "strategy", "risk", "competitor",
+  "buying_signal", "objection", "next_step", "competitor_mention", "timing",
+  "other"
 ]);
 
 export const ChannelEnum = z.enum(["email", "linkedin", "phone", "other"]);

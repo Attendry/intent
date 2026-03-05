@@ -406,6 +406,54 @@ ${notes}`;
   }
 }
 
+export interface MeetingSignal {
+  type: "buying_signal" | "objection" | "next_step" | "competitor_mention" | "timing" | "other";
+  summary: string;
+  urgencyScore: number;
+  outreachAngle?: string;
+}
+
+const MEETING_SIGNAL_TYPES = ["buying_signal", "objection", "next_step", "competitor_mention", "timing", "other"] as const;
+
+export async function extractMeetingSignals(
+  userId: string,
+  notes: string,
+  summary?: string | null
+): Promise<MeetingSignal[]> {
+  const system = `You are a B2B sales meeting analyst. Given meeting notes, extract actionable follow-up signals that should surface in a sales rep's queue. Each signal is something the rep should act on or reference in future outreach.
+
+For each distinct actionable item, produce:
+- type: one of buying_signal, objection, next_step, competitor_mention, timing, other
+- summary: 1-2 sentence description (what was said or implied). Be specific; include names, dates, or quotes when relevant.
+- urgencyScore: 1-5. 5 = act immediately (e.g. "sending proposal tomorrow"). 4 = high priority (buying intent, next step). 3 = medium. 2 = low. 1 = informational only.
+- outreachAngle: optional 1 sentence on how to use this in follow-up (e.g. "Reference their Q2 timeline when following up")
+
+Only extract items that warrant follow-up. Skip generic pleasantries, recaps, or non-actionable context. Prefer 2-5 signals per meeting; fewer if notes are thin.
+
+Respond in JSON: { "signals": [ { "type": "...", "summary": "...", "urgencyScore": N, "outreachAngle": "..." } ] }`;
+
+  const prompt = summary
+    ? `Meeting summary: ${summary}\n\nMeeting notes:\n${notes}`
+    : `Meeting notes:\n${notes}`;
+
+  const result = await generate({ userId, system, prompt, json: true, temperature: 0.4 });
+  try {
+    const parsed = JSON.parse(result) as { signals?: Partial<MeetingSignal>[] };
+    const signals = Array.isArray(parsed.signals) ? parsed.signals : [];
+    return signals
+      .filter((s) => s.type && s.summary && MEETING_SIGNAL_TYPES.includes(s.type as (typeof MEETING_SIGNAL_TYPES)[number]))
+      .map((s) => ({
+        type: s.type as MeetingSignal["type"],
+        summary: String(s.summary || "").trim(),
+        urgencyScore: Math.min(5, Math.max(1, Number(s.urgencyScore) || 3)),
+        outreachAngle: s.outreachAngle?.trim() || undefined,
+      }))
+      .filter((s) => s.summary.length > 0);
+  } catch {
+    return [];
+  }
+}
+
 interface DocumentIntelEntry {
   type: string;
   summary: string;
