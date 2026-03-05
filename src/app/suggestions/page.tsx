@@ -22,6 +22,20 @@ import {
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+
+async function parseJsonOrText(res: Response): Promise<{ error?: string; created?: number; message?: string; suggestions?: unknown[] }> {
+  const text = await res.text();
+  try {
+    return JSON.parse(text) as { error?: string; created?: number; message?: string; suggestions?: unknown[] };
+  } catch {
+    if (res.status === 413) {
+      return { error: "File too large. Maximum upload size is 4.5MB (Vercel limit)." };
+    }
+    const fallback = text.trim().startsWith("<") ? "Server error" : (text.slice(0, 200) || "Import failed");
+    return { error: fallback };
+  }
+}
 
 interface Suggestion {
   id: string;
@@ -115,19 +129,44 @@ export default function SuggestionsPage() {
         toast("File too small (min 50 bytes)", "error");
         return;
       }
+      const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10MB
+      if (file.size > MAX_FILE_BYTES) {
+        toast("File too large. Maximum size is 10MB.", "error");
+        return;
+      }
       setImporting(true);
       try {
-        const formData = new FormData();
-        formData.append("file", file);
-        if (eventName) formData.append("eventName", eventName);
+        const urlRes = await fetch("/api/event-attendees/upload-url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ filename: file.name, eventName }),
+        });
+        const urlData = (await urlRes.json()) as { path?: string; bucket?: string; error?: string };
+        if (!urlRes.ok) {
+          throw new Error(urlData.error || "Failed to get upload path");
+        }
+        const supabase = createClient();
+        const { error: uploadError } = await supabase.storage
+          .from(urlData.bucket || "event-attendees")
+          .upload(urlData.path!, file, {
+            contentType: file.type || (file.name.toLowerCase().endsWith(".pdf") ? "application/pdf" : "text/plain"),
+            upsert: false,
+          });
+        if (uploadError) {
+          throw new Error(uploadError.message || "Upload failed. Add an RLS policy for the event-attendees bucket.");
+        }
         const res = await fetch("/api/event-attendees/import", {
           method: "POST",
-          body: formData,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            storagePath: urlData.path,
+            eventName: eventName || undefined,
+          }),
         });
-        const data = await res.json();
+        const data = await parseJsonOrText(res);
         if (!res.ok) throw new Error(data.error || "Import failed");
-        toast(data.message || `${data.created} prospect(s) added for review`, "success");
-        if (data.created > 0) {
+        toast(data.message || `${data.created ?? 0} prospect(s) added for review`, "success");
+        if ((data.created ?? 0) > 0) {
           setImportEventName("");
           fetchSuggestions();
         }
@@ -154,10 +193,10 @@ export default function SuggestionsPage() {
           eventName: eventName || undefined,
         }),
       });
-      const data = await res.json();
+      const data = await parseJsonOrText(res);
       if (!res.ok) throw new Error(data.error || "Import failed");
-      toast(data.message || `${data.created} prospect(s) added for review`, "success");
-      if (data.created > 0) {
+      toast(data.message || `${data.created ?? 0} prospect(s) added for review`, "success");
+      if ((data.created ?? 0) > 0) {
         setImportUrl("");
         setImportText("");
         setImportEventName("");
@@ -173,7 +212,7 @@ export default function SuggestionsPage() {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.name.toLowerCase().endsWith(".pdf")) {
+    if (file.name.toLowerCase().endsWith(".pdf") || file.name.toLowerCase().endsWith(".txt")) {
       handleImport(file);
     } else {
       const reader = new FileReader();

@@ -199,9 +199,10 @@ export const suggestionActionSchema = z.object({
 export const eventAttendeesImportSchema = z.object({
   url: z.string().url().optional(),
   text: z.string().min(50).optional(),
+  storagePath: z.string().min(1).optional(),
   eventName: z.string().max(200).optional(),
-}).refine((d) => !!(d.url || (d.text && d.text.trim().length >= 50)), {
-  message: "url or text (min 50 chars) is required",
+}).refine((d) => !!(d.url || (d.text && d.text.trim().length >= 50) || d.storagePath), {
+  message: "url, text (min 50 chars), or storagePath is required",
 });
 
 export const companyProfilePutSchema = z.object({

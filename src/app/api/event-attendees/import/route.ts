@@ -5,6 +5,9 @@ import { eventAttendeesImportSchema, parseRequestBody } from "@/lib/validation";
 import { extractEventAttendees } from "@/lib/ai";
 import { extractTextFromUrl, extractTextFromBuffer } from "@/lib/text-extract";
 import { normalizeCompanyName } from "@/lib/company-utils";
+import { createAdminClient } from "@/lib/supabase/admin";
+
+const EVENT_BUCKET = "event-attendees";
 
 export const maxDuration = 90;
 
@@ -27,52 +30,54 @@ export async function POST(request: NextRequest) {
 
     const contentType = request.headers.get("content-type") || "";
     if (contentType.includes("multipart/form-data")) {
-      const formData = await request.formData();
-      const file = formData.get("file") as File | null;
-      eventName = (formData.get("eventName") as string)?.trim() || undefined;
-      if (file && file.size > 0) {
-        const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10MB
-        if (file.size > MAX_FILE_BYTES) {
+      return NextResponse.json(
+        { error: "Use Supabase upload for files. Get an upload URL first, upload to storage, then call import with storagePath." },
+        { status: 400 }
+      );
+    }
+
+    const parsed = await parseRequestBody(request, eventAttendeesImportSchema);
+    if ("error" in parsed) return parsed.error;
+    url = parsed.data.url;
+    text = parsed.data.text;
+    const storagePath = parsed.data.storagePath;
+    eventName = parsed.data.eventName;
+
+    if (storagePath) {
+      try {
+        const supabase = createAdminClient();
+        const { data, error } = await supabase.storage
+          .from(EVENT_BUCKET)
+          .download(storagePath);
+        if (error) {
           return NextResponse.json(
-            { error: "File too large (max 10MB)" },
+            { error: error.message || "Failed to download file from storage" },
             { status: 400 }
           );
         }
-        const buffer = new Uint8Array(await file.arrayBuffer());
-        if (buffer.length < 50) {
+        if (!data || data.size < 50) {
           return NextResponse.json(
-            { error: "File too small (min 50 bytes)" },
+            { error: "File too small or empty (min 50 bytes)" },
             { status: 400 }
           );
         }
-        try {
-          text = await extractTextFromBuffer(buffer, file.name);
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : "Failed to parse file";
-          return NextResponse.json({ error: msg }, { status: 400 });
-        }
+        const buffer = new Uint8Array(await data.arrayBuffer());
+        const filename = storagePath.split("/").pop() || "document";
+        text = await extractTextFromBuffer(buffer, filename);
         if (text.length < 50) {
           return NextResponse.json(
             { error: "Extracted text too short (min 50 chars)" },
             { status: 400 }
           );
         }
-      } else {
-        return NextResponse.json(
-          { error: "file is required for form upload" },
-          { status: 400 }
-        );
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Failed to fetch file from storage";
+        return NextResponse.json({ error: msg }, { status: 400 });
       }
-    } else {
-      const parsed = await parseRequestBody(request, eventAttendeesImportSchema);
-      if ("error" in parsed) return parsed.error;
-      url = parsed.data.url;
-      text = parsed.data.text;
-      eventName = parsed.data.eventName;
     }
 
     let rawText: string;
-    const source = url || `event:${eventName || "unknown"}`;
+    const source = url || (storagePath ? `storage:${EVENT_BUCKET}/${storagePath}` : null) || `event:${eventName || "unknown"}`;
 
     if (url) {
       try {
@@ -86,7 +91,7 @@ export async function POST(request: NextRequest) {
       rawText = text;
     } else {
       return NextResponse.json(
-        { error: "url or text is required" },
+        { error: "url, text, or storagePath is required" },
         { status: 400 }
       );
     }
