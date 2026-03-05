@@ -22,6 +22,8 @@ import {
   Sparkles,
   ChevronRight,
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import LandingPage from "@/components/landing-page";
 
 type FilterTab = "all" | "signal" | "followup" | "suggested";
 type SortKey = "priority" | "recent" | "company" | "cadence";
@@ -34,6 +36,30 @@ function getGreeting() {
 }
 
 export default function HomePage() {
+  const [user, setUser] = useState<{ id: string } | null | undefined>(undefined);
+
+  useEffect(() => {
+    createClient()
+      .auth.getUser()
+      .then(({ data: { user: u } }) => setUser(u ?? null));
+  }, []);
+
+  if (user === undefined) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (user === null) {
+    return <LandingPage />;
+  }
+
+  return <DashboardContent />;
+}
+
+function DashboardContent() {
   const searchParams = useSearchParams();
   const filterParam = searchParams.get("filter") as FilterTab | null;
   const [items, setItems] = useState<QueueItemData[]>([]);
