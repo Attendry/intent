@@ -200,24 +200,24 @@ export default function QueueCard({ item, onDismiss, onSnooze, onReviewSend }: Q
 
           {/* Signal line */}
           {queueType === "signal" && signal && (
-            <div className="mt-2.5 flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-primary/10">
+            <div className="mt-2.5 flex min-w-0 items-start gap-2 text-xs text-muted-foreground">
+              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-primary/10 mt-0.5">
                 <SourceIcon className="h-3 w-3 text-primary" />
               </div>
-              <span className="min-w-0 truncate font-medium" title={signal.summary || undefined}>
+              <p className="min-w-0 flex-1 line-clamp-2 font-medium break-words" title={signal.summary || undefined}>
                 {signal.summary || signal.type.replace(/_/g, " ")}
-              </span>
+              </p>
               <span className="shrink-0 text-[10px] text-muted-foreground/70">{timeAgo(signal.createdAt)}</span>
             </div>
           )}
 
           {/* Follow-up line */}
           {queueType === "followup" && followUpReason && (
-            <div className="mt-2.5 flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-amber-500/10">
+            <div className="mt-2.5 flex min-w-0 items-start gap-2 text-xs text-muted-foreground">
+              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-amber-500/10 mt-0.5">
                 <Clock className="h-3 w-3 text-amber-600 dark:text-amber-400" />
               </div>
-              <span className="min-w-0 truncate">
+              <p className="min-w-0 flex-1 line-clamp-2 break-words">
                 Follow-up due
                 {followUpReason.lastContactedAt && (
                   <> &middot; Last contact {formatDate(followUpReason.lastContactedAt)}</>
@@ -230,19 +230,19 @@ export default function QueueCard({ item, onDismiss, onSnooze, onReviewSend }: Q
                     {" "}&middot; {followUpReason.daysOverdue}d overdue
                   </span>
                 )}
-              </span>
+              </p>
             </div>
           )}
 
           {/* Suggested line */}
           {queueType === "suggested" && suggestedReason && (
-            <div className="mt-2.5 flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-primary/10">
+            <div className="mt-2.5 flex min-w-0 items-start gap-2 text-xs text-muted-foreground">
+              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-primary/10 mt-0.5">
                 <Lightbulb className="h-3 w-3 text-primary" />
               </div>
-              <span className="min-w-0 truncate font-medium" title={suggestedReason}>
+              <p className="min-w-0 flex-1 line-clamp-2 font-medium break-words" title={suggestedReason}>
                 {suggestedReason}
-              </span>
+              </p>
             </div>
           )}
 
