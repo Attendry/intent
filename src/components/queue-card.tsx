@@ -171,12 +171,12 @@ export default function QueueCard({ item, onDismiss, onSnooze, onReviewSend }: Q
         </div>
 
         {/* Main content */}
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 overflow-hidden">
           {/* Name row */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             <Link
               href={`/prospects/${prospect.id}`}
-              className="truncate text-sm font-semibold text-foreground hover:text-primary transition-colors"
+              className="min-w-0 truncate text-sm font-semibold text-foreground hover:text-primary transition-colors"
             >
               {prospect.firstName} {prospect.lastName}
             </Link>
@@ -200,22 +200,24 @@ export default function QueueCard({ item, onDismiss, onSnooze, onReviewSend }: Q
 
           {/* Signal line */}
           {queueType === "signal" && signal && (
-            <div className="mt-2.5 flex items-center gap-2 text-xs text-muted-foreground">
-              <div className="flex h-5 w-5 items-center justify-center rounded-md bg-primary/10">
+            <div className="mt-2.5 flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-primary/10">
                 <SourceIcon className="h-3 w-3 text-primary" />
               </div>
-              <span className="truncate font-medium">{signal.summary || signal.type.replace(/_/g, " ")}</span>
+              <span className="min-w-0 truncate font-medium" title={signal.summary || undefined}>
+                {signal.summary || signal.type.replace(/_/g, " ")}
+              </span>
               <span className="shrink-0 text-[10px] text-muted-foreground/70">{timeAgo(signal.createdAt)}</span>
             </div>
           )}
 
           {/* Follow-up line */}
           {queueType === "followup" && followUpReason && (
-            <div className="mt-2.5 flex items-center gap-2 text-xs text-muted-foreground">
-              <div className="flex h-5 w-5 items-center justify-center rounded-md bg-amber-500/10">
+            <div className="mt-2.5 flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-amber-500/10">
                 <Clock className="h-3 w-3 text-amber-600 dark:text-amber-400" />
               </div>
-              <span>
+              <span className="min-w-0 truncate">
                 Follow-up due
                 {followUpReason.lastContactedAt && (
                   <> &middot; Last contact {formatDate(followUpReason.lastContactedAt)}</>
@@ -234,11 +236,13 @@ export default function QueueCard({ item, onDismiss, onSnooze, onReviewSend }: Q
 
           {/* Suggested line */}
           {queueType === "suggested" && suggestedReason && (
-            <div className="mt-2.5 flex items-center gap-2 text-xs text-muted-foreground">
-              <div className="flex h-5 w-5 items-center justify-center rounded-md bg-primary/10">
+            <div className="mt-2.5 flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-primary/10">
                 <Lightbulb className="h-3 w-3 text-primary" />
               </div>
-              <span className="font-medium">{suggestedReason}</span>
+              <span className="min-w-0 truncate font-medium" title={suggestedReason}>
+                {suggestedReason}
+              </span>
             </div>
           )}
 
@@ -258,9 +262,9 @@ export default function QueueCard({ item, onDismiss, onSnooze, onReviewSend }: Q
                 ))}
               </div>
               {contentSuggestions.length > 0 && (
-                <div className="rounded-lg border border-primary/20 bg-primary/5 px-2.5 py-1.5">
-                  <p className="text-[10px] font-semibold text-primary mb-1">Recommended content — use in draft</p>
-                  <div className="flex flex-wrap gap-1.5">
+                <div className="min-w-0 overflow-hidden rounded-lg border border-primary/20 bg-primary/5 px-2.5 py-1.5">
+                  <p className="truncate text-[10px] font-semibold text-primary mb-1">Recommended content — use in draft</p>
+                  <div className="flex min-w-0 flex-wrap gap-1.5">
                     {contentSuggestions.map((c) => (
                       <Badge key={c.id} variant="secondary" className="gap-1 text-[10px] py-0.5 px-2">
                         <FileText className="h-2.5 w-2.5" />

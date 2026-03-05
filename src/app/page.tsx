@@ -21,6 +21,7 @@ import {
   X,
   Sparkles,
   ChevronRight,
+  Check,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import LandingPage from "@/components/landing-page";
@@ -91,6 +92,7 @@ function DashboardContent() {
     sourceAttribution?: string;
   }>>([]);
   const [briefLoading, setBriefLoading] = useState(true);
+  const [dismissedBriefIds, setDismissedBriefIds] = useState<Set<string>>(new Set());
   const router = useRouter();
   const { toast } = useToast();
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -206,6 +208,50 @@ function DashboardContent() {
   const handleReviewSend = (item: QueueItemData) => {
     const signalParam = item.signal ? `&signalId=${item.signal.id}` : "";
     router.push(`/prospects/${item.prospect.id}?action=draft${signalParam}`);
+  };
+
+  const handleBriefDone = async (briefItem: { id: string; type: string }) => {
+    setDismissedBriefIds((prev) => new Set(prev).add(briefItem.id));
+    if (briefItem.type === "signal") {
+      const signalId = briefItem.id.replace(/^signal:/, "");
+      try {
+        await fetch(`/api/signals/${signalId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ actedOn: true }),
+        });
+        fetchQueue();
+      } catch {
+        setDismissedBriefIds((prev) => {
+          const next = new Set(prev);
+          next.delete(briefItem.id);
+          return next;
+        });
+        toast("Failed to mark as done", "error");
+      }
+    }
+  };
+
+  const handleBriefDiscard = async (briefItem: { id: string; type: string }) => {
+    setDismissedBriefIds((prev) => new Set(prev).add(briefItem.id));
+    if (briefItem.type === "signal") {
+      const signalId = briefItem.id.replace(/^signal:/, "");
+      try {
+        await fetch(`/api/signals/${signalId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dismissed: true }),
+        });
+        fetchQueue();
+      } catch {
+        setDismissedBriefIds((prev) => {
+          const next = new Set(prev);
+          next.delete(briefItem.id);
+          return next;
+        });
+        toast("Failed to discard", "error");
+      }
+    }
   };
 
   const getItemKey = (item: QueueItemData) => item.prospect.id + (item.signal?.id || "followup");
@@ -362,35 +408,57 @@ function DashboardContent() {
           </div>
         ) : (
           <div className="rounded-xl border border-border/60 bg-card divide-y divide-border/60">
-            {briefItems.map((item) => (
-              <div
-                key={item.id}
-                className="flex items-center justify-between gap-4 p-4 hover:bg-muted/30 transition-colors"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-foreground truncate">
-                    {item.prospectName}
-                    {item.companyName && (
-                      <span className="text-muted-foreground font-normal"> at {item.companyName}</span>
-                    )}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                    {item.summary}
-                    {item.sourceAttribution && (
-                      <span className="ml-1">— {item.sourceAttribution}</span>
-                    )}
-                  </p>
-                </div>
-                <Button
-                  size="sm"
-                  className="shrink-0 gap-1"
-                  onClick={() => router.push(item.ctaUrl)}
+            {briefItems
+              .filter((item) => !dismissedBriefIds.has(item.id))
+              .map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between gap-4 p-4 hover:bg-muted/30 transition-colors"
                 >
-                  {item.nextBestAction}
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            ))}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {item.prospectName}
+                      {item.companyName && (
+                        <span className="text-muted-foreground font-normal"> at {item.companyName}</span>
+                      )}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                      {item.summary}
+                      {item.sourceAttribution && (
+                        <span className="ml-1">— {item.sourceAttribution}</span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <Button
+                      size="sm"
+                      className="gap-1"
+                      onClick={() => router.push(item.ctaUrl)}
+                    >
+                      {item.nextBestAction}
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                      title="Mark as done"
+                      onClick={() => handleBriefDone(item)}
+                    >
+                      <Check className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                      title="Discard"
+                      onClick={() => handleBriefDiscard(item)}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
           </div>
         )}
       </div>
