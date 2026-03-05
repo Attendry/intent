@@ -62,6 +62,17 @@ Or for development (creates migration if needed):
 npx prisma migrate dev --name init_postgres
 ```
 
+## 2b. Fix P3009 (Failed Migrations)
+
+If Vercel build fails with **P3009** ("migrate found failed migrations in the target database"):
+
+1. **Preferred:** Run locally with production DB URL:
+   ```bash
+   DIRECT_URL="postgresql://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:5432/postgres" npx prisma migrate resolve --applied "20250305000000_add_meeting_log"
+   ```
+
+2. **Alternative:** Run `prisma/migrations/fix_meeting_log_migration.sql` in Supabase SQL Editor. This removes failed rows and inserts the correct migration record.
+
 ## 3. Supabase Auth Configuration
 
 In your Supabase project dashboard:
