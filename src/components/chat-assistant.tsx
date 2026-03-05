@@ -387,12 +387,6 @@ export default function ChatAssistant() {
     window.addEventListener("intent:open-chat", handler);
     return () => window.removeEventListener("intent:open-chat", handler);
   }, []);
-  useEffect(() => {
-    if (open && pendingMessage && !streaming) {
-      sendMessage(pendingMessage);
-      setPendingMessage(null);
-    }
-  }, [open, pendingMessage, streaming, sendMessage]);
 
   // @ mention search
   useEffect(() => {
@@ -589,6 +583,14 @@ export default function ChatAssistant() {
     },
     [messages, context, streaming]
   );
+
+  // Process pending message when chat opens (from "Prep for call" button)
+  useEffect(() => {
+    if (open && pendingMessage && !streaming) {
+      sendMessage(pendingMessage);
+      setPendingMessage(null);
+    }
+  }, [open, pendingMessage, streaming, sendMessage]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
