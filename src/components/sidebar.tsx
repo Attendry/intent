@@ -57,8 +57,8 @@ export default function Sidebar() {
           {[
             { href: "/", label: "Home", icon: LayoutDashboard },
             { href: "/pipeline", label: "Pipeline", icon: Columns3 },
-            { href: "/prospects", label: "Prospects", icon: Users },
             { href: "/companies", label: "Companies", icon: Building2 },
+            { href: "/prospects", label: "Prospects", icon: Users },
             { href: "/suggestions", label: "Suggestions", icon: UserPlus },
           ].map((item) => {
             const isActive =
@@ -92,8 +92,8 @@ export default function Sidebar() {
             { href: "/content", label: "Content", icon: FileText },
             { href: "/social-posts", label: "Social Posts", icon: Share2 },
             { href: "/findings", label: "Findings", icon: Bookmark },
-            { href: "/my-company", label: "My Company", icon: Briefcase },
             { href: "/fit-overview", label: "Fit Overview", icon: Target },
+            { href: "/my-company", label: "My Company", icon: Briefcase },
             { href: "/review", label: "Weekly Review", icon: BarChart3 },
           ].map((item) => {
             const isActive =
