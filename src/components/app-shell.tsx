@@ -16,9 +16,12 @@ export default function AppShell({
   const [user, setUser] = useState<{ id: string } | null | undefined>(undefined);
 
   useEffect(() => {
-    createClient()
-      .auth.getUser()
-      .then(({ data: { user: u } }) => setUser(u ?? null));
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user: u } }) => setUser(u ?? null));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
   const isCapture = pathname === "/capture";
