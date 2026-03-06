@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { requireAuth } from "@/lib/auth";
 import { debugLog } from "@/lib/debug";
 import { documentProcessSchema, parseRequestBody } from "@/lib/validation";
 import { extractDocumentIntel } from "@/lib/ai";
@@ -54,6 +55,15 @@ export async function POST(
   const { id: companyId } = await params;
 
   try {
+    const auth = await requireAuth();
+    if ("error" in auth) return auth.error;
+
+    const { requireCompanyAccess } = await import("@/lib/access");
+    const accessResult = await requireCompanyAccess(companyId, auth.user.id, {
+      allowCollaborator: true,
+    });
+    if ("error" in accessResult) return accessResult.error;
+
     const parsed = await parseRequestBody(request, documentProcessSchema);
     if ("error" in parsed) {
       console.error("[doc-process] Validation failed");

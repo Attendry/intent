@@ -40,6 +40,34 @@ export function formatDate(dateStr: string): string {
   });
 }
 
+export function formatUpcomingDateKey(dateKey: string): string {
+  const d = new Date(dateKey + "T12:00:00");
+  const now = new Date();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  if (d.toDateString() === tomorrow.toDateString()) return "Tomorrow";
+  return d.toLocaleDateString("en-US", { weekday: "short" });
+}
+
+export function formatScheduledAt(dateStr: string): string {
+  const d = new Date(dateStr);
+  const now = new Date();
+  const isToday =
+    d.getDate() === now.getDate() &&
+    d.getMonth() === now.getMonth() &&
+    d.getFullYear() === now.getFullYear();
+  if (isToday) {
+    return `Today ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
+  }
+  return d.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 /**
  * Returns a Tailwind bg color class based on how recently something was synthesized.
  * Green (<7d), Yellow (7-30d), Red (>30d or never).

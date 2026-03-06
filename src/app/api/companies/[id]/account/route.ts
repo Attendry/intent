@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
+import { getCompanyAccess, requireCompanyAccess } from "@/lib/access";
 
 export async function GET(
   _request: NextRequest,
@@ -9,11 +10,17 @@ export async function GET(
   try {
     const auth = await requireAuth();
     if ("error" in auth) return auth.error;
-    const userId = auth.user.id;
+
     const { id } = await params;
+    const accessResult = await requireCompanyAccess(id, auth.user.id, {
+      allowCollaborator: true,
+    });
+    if ("error" in accessResult) return accessResult.error;
+
+    const access = await getCompanyAccess(id, auth.user.id);
 
     const company = await prisma.company.findFirst({
-      where: { id, userId },
+      where: { id },
       include: {
         prospects: {
           include: {
@@ -91,6 +98,15 @@ export async function GET(
       ? { contacted: contactedCount, total: totalProspects, rolesContacted: contactedCount }
       : null;
 
+    const collaborators = await prisma.accountCollaborator.findMany({
+      where: { companyId: id },
+      include: {
+        user: { select: { id: true, email: true } },
+        inviter: { select: { email: true } },
+      },
+      orderBy: { invitedAt: "desc" },
+    });
+
     return NextResponse.json({
       company: {
         id: company.id,
@@ -98,6 +114,17 @@ export async function GET(
         industry: company.industry,
         fitBucket: company.fitBucket,
       },
+      access: access ?? "owner",
+      collaborators: collaborators.map((c) => ({
+        id: c.id,
+        userId: c.userId,
+        email: c.user.email,
+        role: c.role,
+        invitedBy: c.inviter.email,
+        invitedAt: c.invitedAt,
+        acceptedAt: c.acceptedAt,
+        status: c.acceptedAt ? "accepted" : "pending",
+      })),
       prospects: prospectsWithAction,
       priorityActions,
       coverage: coverageSummary,

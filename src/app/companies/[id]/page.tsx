@@ -76,6 +76,7 @@ interface CompanyDetail {
     actionContext: string | null;
     createdAt: string;
     document?: { sourceUrl: string | null; title: string; viewUrl?: string | null } | null;
+    createdBy?: { id: string; email: string | null } | null;
   }[];
   documents: {
     id: string;
@@ -929,7 +930,10 @@ export default function CompanyDetailPage() {
                       <span className="rounded bg-red-500/10 px-1.5 py-0.5 text-[10px] font-medium text-red-600">High priority</span>
                     )}
                   </div>
-                  <span className="text-xs text-muted-foreground">{new Date(entry.createdAt).toLocaleDateString()}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(entry.createdAt).toLocaleDateString()}
+                    {entry.createdBy?.email && ` · Added by ${entry.createdBy.email}`}
+                  </span>
                 </div>
                 <p className="mt-2 text-sm text-foreground">{entry.summary}</p>
                 {entry.actionContext && (

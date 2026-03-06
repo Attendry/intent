@@ -24,7 +24,11 @@ import {
   User,
   Lightbulb,
   Share2,
+  Calendar,
+  Check,
+  X,
 } from "lucide-react";
+import { formatScheduledAt } from "@/lib/format";
 
 interface Company {
   id: string;
@@ -102,8 +106,38 @@ export default function SocialPostsPage() {
   const [posts, setPosts] = useState<{ body: string; theme: string; partLabel?: string }[]>([]);
   const [displayIndex, setDisplayIndex] = useState(0);
 
+  // Tabs: Create | Schedule
+  const [tab, setTab] = useState<"create" | "schedule">("create");
+
+  // Save modal
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [saveModalDate, setSaveModalDate] = useState("");
+  const [saveModalTime, setSaveModalTime] = useState("09:00");
+  const [saveModalFirstComment, setSaveModalFirstComment] = useState("");
+  const [saveModalSeriesId, setSaveModalSeriesId] = useState<string | null>(null);
+  const [saveModalNotes, setSaveModalNotes] = useState("");
+  const [expandedFirstComment, setExpandedFirstComment] = useState(false);
+  const [expandedSeries, setExpandedSeries] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Schedule tab
+  const [scheduledPosts, setScheduledPosts] = useState<{
+    id: string;
+    body: string;
+    status: string;
+    scheduledAt: string;
+    firstComment: string | null;
+    seriesId: string | null;
+  }[]>([]);
+  const [scheduledCounts, setScheduledCounts] = useState({ overdue: 0, today: 0, upcoming: 0 });
+  const [scheduledLoading, setScheduledLoading] = useState(false);
+  const [markingPosted, setMarkingPosted] = useState<string | null>(null);
+
   // Pre-fill from URL params
   useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam === "schedule") setTab("schedule");
+
     const companyId = searchParams.get("companyId");
     const prospectId = searchParams.get("prospectId");
     const signalId = searchParams.get("signalId");
@@ -324,6 +358,109 @@ export default function SocialPostsPage() {
     toast("Copied to clipboard", "success");
   }, [currentPostBody, toast]);
 
+  const fetchScheduledPosts = useCallback(async () => {
+    setScheduledLoading(true);
+    try {
+      const res = await fetch("/api/scheduled-posts");
+      if (res.ok) {
+        const data = await res.json();
+        setScheduledPosts(data.data || []);
+        setScheduledCounts({
+          overdue: data.overdue ?? 0,
+          today: data.today ?? 0,
+          upcoming: data.upcoming ?? 0,
+        });
+      }
+    } catch {
+      setScheduledPosts([]);
+    } finally {
+      setScheduledLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (tab === "schedule") fetchScheduledPosts();
+  }, [tab, fetchScheduledPosts]);
+
+  // Fetch counts on mount for Schedule tab badge
+  useEffect(() => {
+    fetch("/api/scheduled-posts")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d && (d.overdue || d.today || d.upcoming)) {
+          setScheduledCounts({
+            overdue: d.overdue ?? 0,
+            today: d.today ?? 0,
+            upcoming: d.upcoming ?? 0,
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleOpenSaveModal = useCallback(() => {
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10);
+    const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+    setSaveModalDate(dateStr);
+    setSaveModalTime(timeStr);
+    setSaveModalFirstComment("");
+    setSaveModalSeriesId(series && posts.length > 1 ? crypto.randomUUID() : null);
+    setSaveModalNotes("");
+    setExpandedFirstComment(false);
+    setExpandedSeries(false);
+    setShowSaveModal(true);
+  }, [series, posts.length]);
+
+  const handleConfirmSave = useCallback(async () => {
+    if (!currentPostBody || !saveModalDate || !saveModalTime) return;
+    setSaving(true);
+    try {
+      const scheduledAt = new Date(`${saveModalDate}T${saveModalTime}:00`);
+      const res = await fetch("/api/scheduled-posts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          body: currentPostBody,
+          scheduledAt: scheduledAt.toISOString(),
+          firstComment: saveModalFirstComment.trim() || undefined,
+          seriesId: saveModalSeriesId || undefined,
+          notes: saveModalNotes.trim() || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to save");
+      }
+      toast("Post saved for later. It will appear in Today when due.", "success");
+      setShowSaveModal(false);
+      setTab("schedule");
+      fetchScheduledPosts();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to save", "error");
+    } finally {
+      setSaving(false);
+    }
+  }, [currentPostBody, saveModalDate, saveModalTime, saveModalFirstComment, saveModalSeriesId, saveModalNotes, toast, fetchScheduledPosts]);
+
+  const handleMarkPosted = useCallback(async (id: string) => {
+    setMarkingPosted(id);
+    try {
+      const res = await fetch(`/api/scheduled-posts/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "posted" }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      toast("Marked as posted", "success");
+      fetchScheduledPosts();
+    } catch {
+      toast("Failed to mark as posted", "error");
+    } finally {
+      setMarkingPosted(null);
+    }
+  }, [toast, fetchScheduledPosts]);
+
   const hookLength = currentPostBody
     ? currentPostBody.split("\n")[0]?.length ?? 0
     : 0;
@@ -340,8 +477,61 @@ export default function SocialPostsPage() {
         <p className="mt-1 text-sm text-muted-foreground">
           Create LinkedIn posts tailored for sales motions — thought leadership, stories, questions.
         </p>
+        <div className="mt-4 flex gap-1 rounded-lg border border-border p-0.5 w-fit">
+          <button
+            onClick={() => setTab("create")}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+              tab === "create"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            Create
+          </button>
+          <button
+            onClick={() => setTab("schedule")}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+              tab === "schedule"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Calendar className="h-3.5 w-3.5" />
+            Schedule
+            {(scheduledCounts.overdue + scheduledCounts.today) > 0 && (
+              <span className="ml-1 rounded-full bg-primary/20 px-1.5 py-0.5 text-xs">
+                {scheduledCounts.overdue + scheduledCounts.today}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
 
+      {scheduledCounts.overdue > 0 && tab === "create" && (
+        <div className="mb-6 flex items-center justify-between gap-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+          <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+            {scheduledCounts.overdue} post{scheduledCounts.overdue !== 1 ? "s" : ""} from last week — mark posted or reschedule.
+          </p>
+          <Button size="sm" variant="outline" onClick={() => setTab("schedule")}>
+            View schedule
+          </Button>
+        </div>
+      )}
+
+      {tab === "schedule" ? (
+        <ScheduleTab
+          posts={scheduledPosts}
+          counts={scheduledCounts}
+          loading={scheduledLoading}
+          markingPosted={markingPosted}
+          onMarkPosted={handleMarkPosted}
+          onRefresh={fetchScheduledPosts}
+          onSwitchToCreate={() => setTab("create")}
+        />
+      ) : (
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Left: config */}
         <div className="space-y-6">
@@ -744,6 +934,15 @@ export default function SocialPostsPage() {
                     <Copy className="h-3.5 w-3.5" />
                     Copy
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleOpenSaveModal}
+                    className="gap-1.5"
+                  >
+                    <Calendar className="h-3.5 w-3.5" />
+                    Save for later
+                  </Button>
                   <div className="relative">
                     <Button
                       size="sm"
@@ -844,6 +1043,225 @@ export default function SocialPostsPage() {
           )}
         </div>
       </div>
+      )}
+
+      {/* Save modal */}
+      {showSaveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-base">Save for later</CardTitle>
+              <button
+                onClick={() => setShowSaveModal(false)}
+                className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Date</label>
+                <input
+                  type="date"
+                  value={saveModalDate}
+                  onChange={(e) => setSaveModalDate(e.target.value)}
+                  className="h-9 w-full rounded-lg border border-border bg-background px-3 text-sm"
+                  aria-label="Scheduled date"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Time</label>
+                <input
+                  type="time"
+                  value={saveModalTime}
+                  onChange={(e) => setSaveModalTime(e.target.value)}
+                  className="h-9 w-full rounded-lg border border-border bg-background px-3 text-sm"
+                  aria-label="Scheduled time"
+                />
+              </div>
+
+              <details className="rounded-lg border border-border">
+                <summary
+                  className="cursor-pointer px-3 py-2 text-sm font-medium"
+                  onClick={() => setExpandedFirstComment(!expandedFirstComment)}
+                  aria-expanded={expandedFirstComment}
+                >
+                  Add first comment (optional) — ~3x reach
+                </summary>
+                <div className="border-t border-border px-3 py-2">
+                  <Textarea
+                    placeholder="Link or CTA to paste in first comment after posting"
+                    value={saveModalFirstComment}
+                    onChange={(e) => setSaveModalFirstComment(e.target.value)}
+                    rows={2}
+                    className="text-sm"
+                  />
+                </div>
+              </details>
+
+              {series && posts.length > 1 && (
+                <details className="rounded-lg border border-border">
+                  <summary
+                    className="cursor-pointer px-3 py-2 text-sm font-medium"
+                    onClick={() => setExpandedSeries(!expandedSeries)}
+                    aria-expanded={expandedSeries}
+                  >
+                    Part of series
+                  </summary>
+                  <div className="border-t border-border px-3 py-2 text-xs text-muted-foreground">
+                    Saving part {displayIndex + 1} of {posts.length}. Use the same series when saving other parts.
+                  </div>
+                </details>
+              )}
+
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Notes (optional)</label>
+                <Input
+                  placeholder="e.g. Topic: pricing"
+                  value={saveModalNotes}
+                  onChange={(e) => setSaveModalNotes(e.target.value)}
+                  className="text-sm"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setShowSaveModal(false)}
+                  disabled={saving}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1 gap-1.5"
+                  onClick={handleConfirmSave}
+                  disabled={!saveModalDate || !saveModalTime || saving}
+                >
+                  {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                  Save
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ScheduleTab({
+  posts,
+  counts,
+  loading,
+  markingPosted,
+  onMarkPosted,
+  onSwitchToCreate,
+}: {
+  posts: { id: string; body: string; status: string; scheduledAt: string; firstComment: string | null; seriesId: string | null }[];
+  counts: { overdue: number; today: number; upcoming: number };
+  loading: boolean;
+  markingPosted: string | null;
+  onMarkPosted: (id: string) => void;
+  onRefresh: () => void;
+  onSwitchToCreate?: () => void;
+}) {
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+
+  const overdue = posts.filter((p) => new Date(p.scheduledAt) < todayStart);
+  const today = posts.filter((p) => {
+    const d = new Date(p.scheduledAt);
+    return d >= todayStart && d <= todayEnd;
+  });
+  const upcoming = posts.filter((p) => new Date(p.scheduledAt) > todayEnd);
+
+  if (loading) {
+    return (
+      <div className="rounded-2xl border border-border/60 bg-card p-8 text-center">
+        <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
+        <p className="mt-2 text-sm text-muted-foreground">Loading schedule...</p>
+      </div>
+    );
+  }
+
+  if (posts.length === 0) {
+    return (
+      <div className="rounded-2xl border border-dashed border-border/80 bg-muted/20 py-24 text-center">
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted/60">
+          <Calendar className="h-8 w-8 text-muted-foreground/50" />
+        </div>
+        <p className="text-sm font-medium text-muted-foreground">No posts scheduled.</p>
+        <p className="mt-1 text-xs text-muted-foreground">Generate one and save for later.</p>
+        {onSwitchToCreate && (
+          <Button onClick={onSwitchToCreate} size="sm" className="mt-4 gap-1.5">
+            <Sparkles className="h-3.5 w-3.5" />
+            Create post
+          </Button>
+        )}
+      </div>
+    );
+  }
+
+  const renderPost = (p: (typeof posts)[0], isOverdue: boolean) => (
+    <div
+      key={p.id}
+      className="flex items-start justify-between gap-4 rounded-xl border border-border/60 bg-card p-4"
+    >
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-medium text-muted-foreground mb-1">
+          {formatScheduledAt(p.scheduledAt)}
+          {isOverdue && (
+            <span className="ml-2 rounded bg-amber-500/20 px-1.5 py-0.5 text-amber-700 dark:text-amber-400">Overdue</span>
+          )}
+        </p>
+        <p className="text-sm line-clamp-3">{p.body}</p>
+        {p.firstComment && (
+          <p className="mt-1 text-xs text-muted-foreground">First comment: {p.firstComment.slice(0, 50)}...</p>
+        )}
+      </div>
+      <Button
+        size="sm"
+        onClick={() => onMarkPosted(p.id)}
+        disabled={markingPosted === p.id}
+        className="shrink-0"
+      >
+        {markingPosted === p.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+        Mark posted
+      </Button>
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      {overdue.length > 0 && (
+        <div>
+          <h2 className="text-lg font-semibold mb-3 text-amber-600 dark:text-amber-400">
+            Overdue ({overdue.length})
+          </h2>
+          <div className="space-y-3">
+            {overdue.map((p) => renderPost(p, true))}
+          </div>
+        </div>
+      )}
+      {today.length > 0 && (
+        <div>
+          <h2 className="text-lg font-semibold mb-3">Today ({today.length})</h2>
+          <div className="space-y-3">
+            {today.map((p) => renderPost(p, false))}
+          </div>
+        </div>
+      )}
+      {upcoming.length > 0 && (
+        <div>
+          <h2 className="text-lg font-semibold mb-3 text-muted-foreground">Upcoming ({upcoming.length})</h2>
+          <div className="space-y-3">
+            {upcoming.map((p) => renderPost(p, false))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

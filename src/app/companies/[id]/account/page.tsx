@@ -7,14 +7,17 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Breadcrumbs from "@/components/breadcrumbs";
 import {
-  Building2,
   Users,
   Loader2,
   ChevronRight,
   Target,
-  Calendar,
   Zap,
+  Download,
+  ArrowRightLeft,
+  Activity,
 } from "lucide-react";
+import { CollaboratorsSection } from "@/components/company/collaborators-section";
+import { HandoffModal } from "@/components/company/handoff-modal";
 import { formatLastContacted } from "@/lib/format";
 
 const STAGE_LABELS: Record<string, string> = {
@@ -29,6 +32,17 @@ const STAGE_LABELS: Record<string, string> = {
 
 interface AccountData {
   company: { id: string; name: string; industry: string | null; fitBucket: string | null };
+  access?: "owner" | "collaborator";
+  collaborators?: Array<{
+    id: string;
+    userId: string;
+    email: string | null;
+    role: string;
+    invitedBy: string | null;
+    invitedAt: string;
+    acceptedAt: string | null;
+    status: string;
+  }>;
   prospects: Array<{
     id: string;
     firstName: string;
@@ -53,11 +67,35 @@ interface AccountData {
   findings: Array<{ id: string; content: string; createdAt: string }>;
 }
 
+const ACTIVITY_LABELS: Record<string, string> = {
+  collaborator_added: "Added collaborator",
+  finding_shared: "Shared finding",
+  handoff_requested: "Requested handoff",
+  handoff_accepted: "Accepted handoff",
+  intel_added: "Added intel",
+  meeting_logged: "Logged meeting",
+};
+
+function formatActivityTime(t: string) {
+  const d = new Date(t);
+  const now = new Date();
+  const diff = now.getTime() - d.getTime();
+  if (diff < 60_000) return "Just now";
+  if (diff < 3600_000) return `${Math.floor(diff / 60_000)}m ago`;
+  if (diff < 86400_000) return `${Math.floor(diff / 3600_000)}h ago`;
+  if (diff < 604800_000) return `${Math.floor(diff / 86400_000)}d ago`;
+  return d.toLocaleDateString();
+}
+
 export default function AccountPage() {
   const { id } = useParams<{ id: string }>();
   const [data, setData] = useState<AccountData | null>(null);
   const [loading, setLoading] = useState(true);
   const [coverageCollapsed, setCoverageCollapsed] = useState(true);
+  const [handoffOpen, setHandoffOpen] = useState(false);
+  const [activity, setActivity] = useState<
+    { id: string; action: string; userEmail: string | null; createdAt: string }[]
+  >([]);
 
   const fetchAccount = useCallback(async () => {
     try {
@@ -65,6 +103,11 @@ export default function AccountPage() {
       if (!res.ok) throw new Error("Failed to fetch");
       const json = await res.json();
       setData(json);
+      const actRes = await fetch(`/api/companies/${id}/activity`);
+      if (actRes.ok) {
+        const actData = await actRes.json();
+        setActivity(Array.isArray(actData) ? actData : []);
+      }
     } catch {
       setData(null);
     } finally {
@@ -98,11 +141,16 @@ export default function AccountPage() {
     );
   }
 
-  const { company, prospects, priorityActions, coverage, findings } = data;
+  const { company, access, collaborators, prospects, priorityActions, coverage, findings } = data;
 
   return (
     <div className="mx-auto max-w-5xl animate-fade-in">
       <div className="mb-6 flex items-center gap-4">
+        {access === "collaborator" && (
+          <Badge variant="outline" className="text-xs">
+            You&apos;re a collaborator
+          </Badge>
+        )}
         <Breadcrumbs
           items={[
             { label: "Companies", href: "/companies" },
@@ -116,7 +164,73 @@ export default function AccountPage() {
             <ChevronRight className="h-3.5 w-3.5 rotate-90" />
           </Button>
         </Link>
+        <div className="flex items-center gap-2">
+          <a
+            href={`/api/companies/${id}/export`}
+            download
+            className="inline-flex"
+          >
+            <Button variant="outline" size="sm" className="gap-1">
+              <Download className="h-3.5 w-3.5" />
+              Export
+            </Button>
+          </a>
+          {access === "owner" && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1"
+              onClick={() => setHandoffOpen(true)}
+            >
+              <ArrowRightLeft className="h-3.5 w-3.5" />
+              Transfer
+            </Button>
+          )}
+        </div>
       </div>
+
+      <HandoffModal
+        companyId={id!}
+        companyName={company.name}
+        open={handoffOpen}
+        onClose={() => setHandoffOpen(false)}
+        onSuccess={fetchAccount}
+      />
+
+      {/* Recent activity */}
+      {activity.length > 0 && (
+        <div className="mb-6 rounded-xl border border-border bg-card p-4">
+          <h2 className="flex items-center gap-2 text-sm font-semibold mb-3">
+            <Activity className="h-4 w-4" />
+            Recent activity
+          </h2>
+          <div className="space-y-2">
+            {activity.slice(0, 10).map((a) => (
+              <div
+                key={a.id}
+                className="flex items-center justify-between text-sm text-muted-foreground"
+              >
+                <span>
+                  <span className="font-medium text-foreground">
+                    {a.userEmail || "Someone"}
+                  </span>{" "}
+                  {ACTIVITY_LABELS[a.action] || a.action}
+                </span>
+                <span className="text-xs">{formatActivityTime(a.createdAt)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Collaborators */}
+      <CollaboratorsSection
+        companyId={id!}
+        companyName={company.name}
+        access={access ?? "owner"}
+        collaborators={collaborators ?? []}
+        onUpdate={fetchAccount}
+      />
 
       {/* Priority actions */}
       {priorityActions.length > 0 && (

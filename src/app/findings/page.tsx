@@ -21,9 +21,13 @@ import {
   Link2,
   Trash2,
   Search,
+  Share2,
 } from "lucide-react";
 import { formatDaysAgo } from "@/lib/format";
 import { useToast } from "@/components/ui/toast";
+import { ShareFindingModal } from "@/components/findings/share-finding-modal";
+
+type FilterTab = "all" | "shared" | "by-account";
 
 interface SavedFinding {
   id: string;
@@ -32,6 +36,11 @@ interface SavedFinding {
   prospectId: string | null;
   companyId: string | null;
   createdAt: string;
+  createdBy?: { id: string; email: string | null } | null;
+  shares?: Array<{
+    shareType: string;
+    sharedBy?: { email: string | null };
+  }>;
   prospect?: {
     id: string;
     firstName: string;
@@ -89,10 +98,12 @@ function groupFindings(findings: SavedFinding[]): Map<GroupKey, { label: string;
 }
 
 export default function FindingsPage() {
+  const [filter, setFilter] = useState<FilterTab>("all");
   const [findings, setFindings] = useState<SavedFinding[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedGroups, setExpandedGroups] = useState<Set<GroupKey>>(new Set());
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [shareFindingId, setShareFindingId] = useState<string | null>(null);
   const [linkFindingId, setLinkFindingId] = useState<string | null>(null);
   const [linkSearch, setLinkSearch] = useState("");
   const [linkResults, setLinkResults] = useState<{
@@ -105,7 +116,10 @@ export default function FindingsPage() {
 
   const fetchFindings = useCallback(async () => {
     try {
-      const res = await fetch("/api/findings");
+      const url = filter === "shared"
+        ? "/api/findings/shared-with-me"
+        : `/api/findings?filter=${filter}`;
+      const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to load");
       const json = await res.json();
       setFindings(json);
@@ -118,7 +132,7 @@ export default function FindingsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [filter]);
 
   useEffect(() => {
     fetchFindings();
@@ -230,6 +244,21 @@ export default function FindingsPage() {
         <p className="mt-1 text-sm text-muted-foreground">
           Insights saved from the Sales Assistant, grouped by company
         </p>
+        <div className="mt-4 flex gap-2">
+          {(["all", "shared", "by-account"] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                filter === f
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted/50 text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              {f === "all" ? "All" : f === "shared" ? "Shared with me" : "By account"}
+            </button>
+          ))}
+        </div>
       </div>
 
       {loading ? (
@@ -288,6 +317,7 @@ export default function FindingsPage() {
                         finding={f}
                         onDelete={() => setDeleteId(f.id)}
                         onLink={() => setLinkFindingId(f.id)}
+                        onShare={() => setShareFindingId(f.id)}
                         isLinking={linkFindingId === f.id}
                         linkSearch={linkSearch}
                         setLinkSearch={setLinkSearch}
@@ -301,6 +331,9 @@ export default function FindingsPage() {
                           setLinkSearch("");
                           setLinkResults(null);
                         }}
+                        isSharing={shareFindingId === f.id}
+                        onCloseShare={() => setShareFindingId(null)}
+                        onShareSuccess={fetchFindings}
                       />
                     ))}
                   </CardContent>
@@ -320,6 +353,15 @@ export default function FindingsPage() {
         variant="destructive"
         onConfirm={() => { if (deleteId) handleDelete(deleteId); }}
       />
+
+      {shareFindingId && (
+        <ShareFindingModal
+          findingId={shareFindingId}
+          open={!!shareFindingId}
+          onClose={() => setShareFindingId(null)}
+          onSuccess={fetchFindings}
+        />
+      )}
     </div>
   );
 }
@@ -328,7 +370,9 @@ function FindingCard({
   finding,
   onDelete,
   onLink,
+  onShare,
   isLinking,
+  isSharing,
   linkSearch,
   setLinkSearch,
   linkResults,
@@ -337,11 +381,15 @@ function FindingCard({
   onUnlink,
   updating,
   onCloseLink,
+  onCloseShare,
+  onShareSuccess,
 }: {
   finding: SavedFinding;
   onDelete: () => void;
   onLink: () => void;
+  onShare: () => void;
   isLinking: boolean;
+  isSharing: boolean;
   linkSearch: string;
   setLinkSearch: (v: string) => void;
   linkResults: { prospects: { id: string; firstName: string; lastName: string; company: string | null }[]; companies: { id: string; name: string; industry: string | null }[] } | null;
@@ -350,6 +398,8 @@ function FindingCard({
   onUnlink: () => void;
   updating: boolean;
   onCloseLink: () => void;
+  onCloseShare: () => void;
+  onShareSuccess: () => void;
 }) {
   const hasLink = finding.companyId || finding.prospectId;
 
@@ -379,8 +429,22 @@ function FindingCard({
           {!hasLink && (
             <span className="text-xs text-muted-foreground">Not linked</span>
           )}
+          {finding.shares && finding.shares.length > 0 && (
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] text-primary capitalize">
+              {finding.shares[0].shareType}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-1 shrink-0">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs"
+            onClick={onShare}
+          >
+            <Share2 className="h-3 w-3 mr-1" />
+            Share
+          </Button>
           <Button
             variant="ghost"
             size="sm"
@@ -472,7 +536,12 @@ function FindingCard({
         </div>
       )}
 
-      <p className="text-xs text-muted-foreground">{formatDaysAgo(finding.createdAt)}</p>
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <span>{formatDaysAgo(finding.createdAt)}</span>
+        {finding.createdBy?.email && (
+          <span>Added by {finding.createdBy.email}</span>
+        )}
+      </div>
       <p className="text-sm leading-relaxed whitespace-pre-wrap">{finding.content}</p>
     </div>
   );

@@ -30,6 +30,8 @@ import {
   Trash2,
   Bookmark,
   ChevronRight,
+  UserPlus,
+  ArrowRightLeft,
 } from "lucide-react";
 
 interface ApiKeysConfiguredViaEnv {
@@ -206,6 +208,50 @@ export default function SettingsPage() {
       </div>
 
       <div className="flex flex-col gap-6">
+        {/* Collaborator invites */}
+        <Link href="/settings/invites">
+          <Card className="hover:border-primary/50 transition-colors cursor-pointer">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2.5">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <UserPlus className="h-3.5 w-3.5" />
+                </div>
+                Collaborator invites
+              </CardTitle>
+              <CardDescription>
+                View and manage invitations to collaborate on accounts.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <span className="text-sm text-primary font-medium flex items-center gap-1">
+                View invites <ChevronRight className="h-4 w-4" />
+              </span>
+            </CardContent>
+          </Card>
+        </Link>
+
+        {/* Account handoffs */}
+        <Link href="/handoffs">
+          <Card className="hover:border-primary/50 transition-colors cursor-pointer">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2.5">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600">
+                  <ArrowRightLeft className="h-3.5 w-3.5" />
+                </div>
+                Account handoffs
+              </CardTitle>
+              <CardDescription>
+                Accept or decline account transfer requests.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <span className="text-sm text-primary font-medium flex items-center gap-1">
+                View handoffs <ChevronRight className="h-4 w-4" />
+              </span>
+            </CardContent>
+          </Card>
+        </Link>
+
         {/* API Keys */}
         <Card>
           <CardHeader>

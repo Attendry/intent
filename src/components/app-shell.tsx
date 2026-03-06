@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import Sidebar from "@/components/sidebar";
 import TopBar from "@/components/topbar";
 import ChatAssistant from "@/components/chat-assistant";
+import { InvitesBanner } from "@/components/invites-banner";
+import { HandoffsBanner } from "@/components/handoffs-banner";
 import { createClient } from "@/lib/supabase/client";
 
 export default function AppShell({
@@ -49,6 +51,8 @@ export default function AppShell({
       <Sidebar />
       <TopBar />
       <main className="ml-0 md:ml-[60px] mt-16 min-h-[calc(100vh-4rem)] p-4 md:p-8 bg-background">
+        <InvitesBanner />
+        <HandoffsBanner />
         {children}
       </main>
       <ChatAssistant />

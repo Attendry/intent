@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
+import { requireCompanyAccess } from "@/lib/access";
 import { documentUrlSchema, parseRequestBody } from "@/lib/validation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { writeFile, mkdir, unlink } from "fs/promises";
@@ -30,7 +31,15 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAuth();
+    if ("error" in auth) return auth.error;
+
     const { id } = await params;
+    const accessResult = await requireCompanyAccess(id, auth.user.id, {
+      allowCollaborator: true,
+    });
+    if ("error" in accessResult) return accessResult.error;
+
     const documents = await prisma.companyDocument.findMany({
       where: { companyId: id },
       orderBy: { createdAt: "desc" },
@@ -52,7 +61,12 @@ export async function POST(
     const userId = auth.user.id;
 
     const { id } = await params;
-    const company = await prisma.company.findFirst({ where: { id, userId } });
+    const accessResult = await requireCompanyAccess(id, userId, {
+      allowCollaborator: true,
+    });
+    if ("error" in accessResult) return accessResult.error;
+
+    const company = await prisma.company.findFirst({ where: { id } });
     if (!company) {
       return NextResponse.json({ error: "Company not found" }, { status: 404 });
     }
@@ -167,10 +181,14 @@ export async function DELETE(
   try {
     const auth = await requireAuth();
     if ("error" in auth) return auth.error;
-    const userId = auth.user.id;
 
     const { id } = await params;
-    const company = await prisma.company.findFirst({ where: { id, userId } });
+    const accessResult = await requireCompanyAccess(id, auth.user.id, {
+      allowCollaborator: false,
+    });
+    if ("error" in accessResult) return accessResult.error;
+
+    const company = await prisma.company.findFirst({ where: { id } });
     if (!company) {
       return NextResponse.json({ error: "Company not found" }, { status: 404 });
     }

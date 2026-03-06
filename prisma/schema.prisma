@@ -24,6 +24,16 @@ model User {
   voiceExamples        VoiceExample[]
   prospectSuggestions  ProspectSuggestion[]
   knowledgeFragments    KnowledgeFragment[]
+  accountCollaborations AccountCollaborator[]
+  collaboratorInvitesSent AccountCollaborator[] @relation("Inviter")
+  findingSharesReceived FindingShare[] @relation("FindingSharesReceived")
+  findingSharesSent     FindingShare[] @relation("FindingSharesSent")
+  findingsCreated       SavedFinding[] @relation("FindingsCreated")
+  intelCreated          CompanyIntel[] @relation("IntelCreated")
+  handoffsFrom         AccountHandoff[] @relation("HandoffsFrom")
+  handoffsTo           AccountHandoff[] @relation("HandoffsTo")
+  accountActivityLogs  AccountActivityLog[]
+  scheduledPosts       ScheduledPost[]
 }
 
 model UserSettings {
@@ -197,6 +207,62 @@ model ProspectSuggestion {
   @@index([status])
 }
 
+model AccountCollaborator {
+  id         String    @id @default(cuid())
+  companyId  String
+  userId     String
+  role       String    @default("viewer") // viewer, contributor
+  invitedBy  String
+  invitedAt  DateTime  @default(now())
+  acceptedAt DateTime? // null until collaborator accepts
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  inviter User    @relation("Inviter", fields: [invitedBy], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, userId])
+  @@index([companyId])
+  @@index([userId])
+}
+
+model AccountHandoff {
+  id           String    @id @default(cuid())
+  companyId    String
+  fromUserId   String
+  toUserId     String
+  status       String    @default("pending") // pending, accepted, declined
+  checklist    String?   // JSON
+  handoffNotes String?
+  requestedAt  DateTime  @default(now())
+  completedAt  DateTime?
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fromUser User   @relation("HandoffsFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser   User   @relation("HandoffsTo", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([fromUserId])
+  @@index([toUserId])
+  @@index([status])
+}
+
+model AccountActivityLog {
+  id         String    @id @default(cuid())
+  companyId  String
+  userId     String
+  action     String    // collaborator_added, finding_shared, handoff_requested, handoff_accepted, intel_added, meeting_logged
+  entityType String?
+  entityId   String?
+  createdAt  DateTime  @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
 model Company {
   id                   String    @id @default(cuid())
   userId               String
@@ -220,10 +286,13 @@ model Company {
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  prospects Prospect[]
-  intel     CompanyIntel[]
-  documents CompanyDocument[]
+  user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  collaborators AccountCollaborator[]
+  handoffs      AccountHandoff[]
+  activityLogs  AccountActivityLog[]
+  prospects     Prospect[]
+  intel         CompanyIntel[]
+  documents     CompanyDocument[]
   savedFindings SavedFinding[]
   knowledgeFragments KnowledgeFragment[]
 
@@ -272,14 +341,34 @@ model CompanyIntel {
   date          DateTime?
   urgencyScore  Int       @default(3)
   actionContext String?
+  createdById   String?   // who added it; null for auto-generated
   createdAt     DateTime  @default(now())
 
-  company  Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  document CompanyDocument? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  company   Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  document  CompanyDocument? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  createdBy User?            @relation("IntelCreated", fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([companyId])
   @@index([documentId])
   @@index([createdAt])
+}
+
+model FindingShare {
+  id           String   @id @default(cuid())
+  findingId    String
+  sharedWithId String
+  sharedById   String
+  sharedAt     DateTime @default(now())
+  message      String?
+  shareType    String   @default("fyi") // actionable, fyi, handoff
+
+  finding    SavedFinding @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  sharedWith User         @relation("FindingSharesReceived", fields: [sharedWithId], references: [id], onDelete: Cascade)
+  sharedBy   User         @relation("FindingSharesSent", fields: [sharedById], references: [id], onDelete: Cascade)
+
+  @@unique([findingId, sharedWithId])
+  @@index([findingId])
+  @@index([sharedWithId])
 }
 
 model SavedFinding {
@@ -288,10 +377,13 @@ model SavedFinding {
   source      String   @default("chat") // chat, etc.
   prospectId  String?
   companyId   String?
+  createdById String?  // who created it
   createdAt   DateTime @default(now())
 
-  prospect Prospect? @relation(fields: [prospectId], references: [id], onDelete: SetNull)
-  company  Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  prospect Prospect?     @relation(fields: [prospectId], references: [id], onDelete: SetNull)
+  company  Company?     @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  createdBy User?       @relation("FindingsCreated", fields: [createdById], references: [id], onDelete: SetNull)
+  shares   FindingShare[]
 
   @@index([prospectId])
   @@index([companyId])
@@ -320,6 +412,29 @@ model CompanyDocument {
   intel   CompanyIntel[]
 
   @@index([companyId])
+  @@index([status])
+}
+
+model ScheduledPost {
+  id           String    @id @default(cuid())
+  userId       String
+  platform     String    @default("linkedin") // LinkedIn only for MVP; extensible later
+  body         String
+  status       String    @default("scheduled") // scheduled, posted, cancelled, overdue
+  scheduledAt  DateTime
+  postedAt     DateTime?
+  notes        String?
+  firstComment String?   // Link/CTA to paste in first comment (~3x reach)
+  prospectIds  String?   // JSON array - who to share with (set at publish time)
+  seriesId     String?   // Optional grouping for multi-part posts
+  timezone     String?   @default("UTC")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([scheduledAt])
   @@index([status])
 }
 

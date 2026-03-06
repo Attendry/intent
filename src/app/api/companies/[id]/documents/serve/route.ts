@@ -32,12 +32,18 @@ export async function GET(
     if ("error" in auth) return auth.error;
     const userId = auth.user.id;
 
+    const { requireCompanyAccess } = await import("@/lib/access");
+    const accessResult = await requireCompanyAccess(companyId, userId, {
+      allowCollaborator: true,
+    });
+    if ("error" in accessResult) return accessResult.error;
+
     const doc = await prisma.companyDocument.findUnique({
       where: { id: docId },
-      include: { company: { select: { userId: true } } },
+      include: { company: { select: { id: true } } },
     });
 
-    if (!doc || doc.companyId !== companyId || !doc.company || doc.company.userId !== userId || !doc.filePath) {
+    if (!doc || doc.companyId !== companyId || !doc.company || !doc.filePath) {
       return NextResponse.json({ error: "Document not found" }, { status: 404 });
     }
 

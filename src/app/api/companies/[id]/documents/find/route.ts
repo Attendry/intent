@@ -51,8 +51,14 @@ export async function POST(
     if ("error" in auth) return auth.error;
     const userId = auth.user.id;
 
+    const { requireCompanyAccess } = await import("@/lib/access");
+    const accessResult = await requireCompanyAccess(companyId, userId, {
+      allowCollaborator: true,
+    });
+    if ("error" in accessResult) return accessResult.error;
+
     const company = await prisma.company.findFirst({
-      where: { id: companyId, userId },
+      where: { id: companyId },
       select: { name: true },
     });
 

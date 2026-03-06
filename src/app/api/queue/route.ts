@@ -49,6 +49,9 @@ export async function GET() {
 
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0);
+    const weekEnd = new Date(now);
+    weekEnd.setDate(weekEnd.getDate() + 7);
 
     const prospectsWithSignals = await prisma.prospect.findMany({
       where: {
@@ -99,6 +102,44 @@ export async function GET() {
 
     const followUpIds = followUpProspects.map((p) => p.id);
     const excludedIds = [...signalIds, ...followUpIds];
+
+    // Upcoming follow-ups: nextFollowUpAt in (tomorrow, today+7] — exclude today (already in queue)
+    const upcomingFollowUpProspects = await prisma.prospect.findMany({
+      where: {
+        userId,
+        nextFollowUpAt: { gt: today, lte: weekEnd },
+        NOT: { id: { in: excludedIds } },
+      },
+      include: {
+        outreach: { orderBy: { createdAt: "desc" }, take: 1 },
+      },
+      orderBy: { nextFollowUpAt: "asc" },
+    });
+
+    // Group upcoming by date for "Tomorrow 3 · Wed 2 · Fri 1"
+    const upcomingByDate: Record<string, Array<{
+      prospectId: string;
+      prospectName: string;
+      company: string | null;
+      lastChannel: string | null;
+      lastOutcome: string | null;
+      lastContactedAt: Date | null;
+      nextFollowUpAt: Date;
+    }>> = {};
+    for (const p of upcomingFollowUpProspects) {
+      const lastOutreach = p.outreach[0];
+      const dateKey = p.nextFollowUpAt!.toISOString().slice(0, 10);
+      if (!upcomingByDate[dateKey]) upcomingByDate[dateKey] = [];
+      upcomingByDate[dateKey].push({
+        prospectId: p.id,
+        prospectName: `${p.firstName} ${p.lastName}`,
+        company: p.company,
+        lastChannel: lastOutreach?.channel || null,
+        lastOutcome: lastOutreach?.outcome || null,
+        lastContactedAt: p.lastContactedAt,
+        nextFollowUpAt: p.nextFollowUpAt!,
+      });
+    }
 
     // Suggested outreach: prospects with no active signals and no overdue follow-ups
     const suggestedProspects = await prisma.prospect.findMany({
@@ -248,6 +289,7 @@ export async function GET() {
       signalCount: queueItems.filter((i) => i.queueType === "signal").length,
       followUpCount: queueItems.filter((i) => i.queueType === "followup").length,
       suggestedCount,
+      upcomingFollowUps: upcomingByDate,
     });
   } catch (error) {
     console.error("GET /api/queue error:", error);

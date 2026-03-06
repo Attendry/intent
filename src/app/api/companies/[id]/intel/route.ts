@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
+import { requireCompanyAccess } from "@/lib/access";
 import { createFragmentFromCompanyIntel } from "@/lib/fragment-sync";
+import { logAccountActivity } from "@/lib/activity-log";
 
 export async function GET(
   _request: NextRequest,
@@ -10,10 +12,14 @@ export async function GET(
   try {
     const auth = await requireAuth();
     if ("error" in auth) return auth.error;
-    const userId = auth.user.id;
 
     const { id } = await params;
-    const company = await prisma.company.findFirst({ where: { id, userId } });
+    const accessResult = await requireCompanyAccess(id, auth.user.id, {
+      allowCollaborator: true,
+    });
+    if ("error" in accessResult) return accessResult.error;
+
+    const company = await prisma.company.findFirst({ where: { id } });
     if (!company) {
       return NextResponse.json({ error: "Company not found" }, { status: 404 });
     }
@@ -21,6 +27,9 @@ export async function GET(
     const intel = await prisma.companyIntel.findMany({
       where: { companyId: id },
       orderBy: { createdAt: "desc" },
+      include: {
+        createdBy: { select: { id: true, email: true } },
+      },
     });
     return NextResponse.json(intel);
   } catch (error) {
@@ -39,7 +48,12 @@ export async function POST(
     const userId = auth.user.id;
 
     const { id } = await params;
-    const company = await prisma.company.findFirst({ where: { id, userId } });
+    const accessResult = await requireCompanyAccess(id, auth.user.id, {
+      allowCollaborator: true,
+    });
+    if ("error" in accessResult) return accessResult.error;
+
+    const company = await prisma.company.findFirst({ where: { id } });
     if (!company) {
       return NextResponse.json({ error: "Company not found" }, { status: 404 });
     }
@@ -62,6 +76,7 @@ export async function POST(
         date: body.date ? new Date(body.date) : null,
         urgencyScore: body.urgencyScore ?? 3,
         actionContext: body.actionContext || null,
+        createdById: auth.user.id,
       },
     });
 
@@ -74,6 +89,10 @@ export async function POST(
       urgencyScore: intel.urgencyScore,
       date: intel.date,
     }).catch((e) => console.error("[fragment-sync] intel:", e));
+
+    logAccountActivity(id, auth.user.id, "intel_added", "intel", intel.id).catch(
+      () => {}
+    );
 
     await prisma.company.update({
       where: { id },

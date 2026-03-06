@@ -16,8 +16,14 @@ export async function POST(
     const userId = auth.user.id;
 
     const { id: companyId } = await params;
+    const { requireCompanyAccess } = await import("@/lib/access");
+    const accessResult = await requireCompanyAccess(companyId, userId, {
+      allowCollaborator: true,
+    });
+    if ("error" in accessResult) return accessResult.error;
+
     const company = await prisma.company.findFirst({
-      where: { id: companyId, userId },
+      where: { id: companyId },
     });
     if (!company) {
       return NextResponse.json({ error: "Company not found" }, { status: 404 });

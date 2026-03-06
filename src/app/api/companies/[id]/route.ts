@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
+import { requireCompanyAccess } from "@/lib/access";
 
 export async function GET(
   _request: NextRequest,
@@ -9,11 +10,15 @@ export async function GET(
   try {
     const auth = await requireAuth();
     if ("error" in auth) return auth.error;
-    const userId = auth.user.id;
 
     const { id } = await params;
+    const accessResult = await requireCompanyAccess(id, auth.user.id, {
+      allowCollaborator: true,
+    });
+    if ("error" in accessResult) return accessResult.error;
+
     const company = await prisma.company.findFirst({
-      where: { id, userId },
+      where: { id },
       include: {
         prospects: {
           select: {
@@ -87,12 +92,16 @@ export async function PUT(
   try {
     const auth = await requireAuth();
     if ("error" in auth) return auth.error;
-    const userId = auth.user.id;
 
     const { id } = await params;
+    const accessResult = await requireCompanyAccess(id, auth.user.id, {
+      allowCollaborator: false,
+    });
+    if ("error" in accessResult) return accessResult.error;
+
     const body = await request.json();
 
-    const existing = await prisma.company.findFirst({ where: { id, userId } });
+    const existing = await prisma.company.findFirst({ where: { id } });
     if (!existing) {
       return NextResponse.json({ error: "Company not found" }, { status: 404 });
     }
@@ -120,10 +129,14 @@ export async function DELETE(
   try {
     const auth = await requireAuth();
     if ("error" in auth) return auth.error;
-    const userId = auth.user.id;
 
     const { id } = await params;
-    const existing = await prisma.company.findFirst({ where: { id, userId } });
+    const accessResult = await requireCompanyAccess(id, auth.user.id, {
+      allowCollaborator: false,
+    });
+    if ("error" in accessResult) return accessResult.error;
+
+    const existing = await prisma.company.findFirst({ where: { id } });
     if (!existing) {
       return NextResponse.json({ error: "Company not found" }, { status: 404 });
     }

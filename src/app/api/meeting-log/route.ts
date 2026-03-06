@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 import { generateMeetingSummary, extractMeetingSignals } from "@/lib/ai";
 import { createFragmentFromMeetingLog, createFragmentFromSignal } from "@/lib/fragment-sync";
+import { logAccountActivity } from "@/lib/activity-log";
 
 export async function POST(request: NextRequest) {
   try {
@@ -81,6 +82,16 @@ export async function POST(request: NextRequest) {
       actionItems: meetingLog.actionItems,
       outcome: meetingLog.outcome,
     }).catch((e) => console.error("[fragment-sync] meetingLog:", e));
+
+    if (prospect.companyId) {
+      logAccountActivity(
+        prospect.companyId,
+        userId,
+        "meeting_logged",
+        "meeting_log",
+        meetingLog.id
+      ).catch(() => {});
+    }
 
     let signalsCreated = 0;
     const minUrgency = 3;

@@ -21,8 +21,12 @@ import {
   X,
   Sparkles,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Check,
+  Share2,
 } from "lucide-react";
+import { formatUpcomingDateKey } from "@/lib/format";
 import { createClient } from "@/lib/supabase/client";
 import LandingPage from "@/components/landing-page";
 
@@ -80,6 +84,18 @@ function DashboardContent() {
   const [signalCount, setSignalCount] = useState(0);
   const [followUpCount, setFollowUpCount] = useState(0);
   const [suggestedCount, setSuggestedCount] = useState(0);
+  const [upcomingFollowUps, setUpcomingFollowUps] = useState<Record<string, Array<{
+    prospectId: string;
+    prospectName: string;
+    company: string | null;
+    lastChannel: string | null;
+    lastOutcome: string | null;
+    lastContactedAt: string | null;
+    nextFollowUpAt: string;
+  }>>>({});
+  const [upcomingExpanded, setUpcomingExpanded] = useState(false);
+  const [scheduledToday, setScheduledToday] = useState(0);
+  const [scheduledOverdue, setScheduledOverdue] = useState(0);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [briefItems, setBriefItems] = useState<Array<{
     id: string;
@@ -107,9 +123,29 @@ function DashboardContent() {
       clearTimeout(timeoutId);
       if (!res.ok) throw new Error("Failed to fetch queue");
       const text = await res.text();
-      let data: { items?: QueueItemData[]; signalCount?: number; followUpCount?: number; suggestedCount?: number };
+      let data: {
+        items?: QueueItemData[];
+        signalCount?: number;
+        followUpCount?: number;
+        suggestedCount?: number;
+        upcomingFollowUps?: Record<string, Array<{
+          prospectId: string;
+          prospectName: string;
+          company: string | null;
+          lastChannel: string | null;
+          lastOutcome: string | null;
+          lastContactedAt: string | null;
+          nextFollowUpAt: string;
+        }>>;
+      };
       try {
-        data = text ? JSON.parse(text) : { items: [], signalCount: 0, followUpCount: 0, suggestedCount: 0 };
+        data = text ? JSON.parse(text) : {
+          items: [],
+          signalCount: 0,
+          followUpCount: 0,
+          suggestedCount: 0,
+          upcomingFollowUps: {},
+        };
       } catch {
         throw new Error("Invalid response from server");
       }
@@ -117,6 +153,7 @@ function DashboardContent() {
       setSignalCount(data.signalCount || 0);
       setFollowUpCount(data.followUpCount || 0);
       setSuggestedCount(data.suggestedCount || 0);
+      setUpcomingFollowUps(data.upcomingFollowUps || {});
     } catch (err) {
       setError(
         err instanceof Error
@@ -133,6 +170,18 @@ function DashboardContent() {
   useEffect(() => {
     fetchQueue();
   }, [fetchQueue]);
+
+  useEffect(() => {
+    fetch("/api/scheduled-posts")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d) {
+          setScheduledToday(d.today ?? 0);
+          setScheduledOverdue(d.overdue ?? 0);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const fetchBrief = useCallback(async () => {
     try {
@@ -384,12 +433,57 @@ function DashboardContent() {
         </p>
       </div>
 
-      {/* Today's Brief */}
+      {/* Today: Content + Outreach + Brief */}
       <div className="mb-8">
         <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-primary" />
-          Today&apos;s Brief
+          Today
         </h2>
+        <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {(scheduledToday > 0 || scheduledOverdue > 0) && (
+            <Link
+              href="/social-posts?tab=schedule"
+              className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-card p-4 hover:bg-muted/30 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl gradient-primary text-white shadow-soft">
+                  <Share2 className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">
+                    {scheduledToday > 0 && `${scheduledToday} post${scheduledToday !== 1 ? "s" : ""} to publish`}
+                    {scheduledToday > 0 && scheduledOverdue > 0 && " · "}
+                    {scheduledOverdue > 0 && `${scheduledOverdue} overdue`}
+                  </p>
+                  <p className="text-xs text-muted-foreground">LinkedIn</p>
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+            </Link>
+          )}
+          {followUpCount > 0 && (
+            <Link
+              href="/?filter=followup"
+              className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-card p-4 hover:bg-muted/30 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl gradient-warning text-white shadow-soft">
+                  <Clock className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">
+                    {followUpCount} follow-up{followUpCount !== 1 ? "s" : ""} due
+                  </p>
+                  <p className="text-xs text-muted-foreground">Outreach</p>
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+            </Link>
+          )}
+        </div>
+        {(scheduledToday > 0 || scheduledOverdue > 0) && followUpCount > 0 && (
+          <p className="mb-4 text-xs text-muted-foreground">Suggested: Post first, then follow up.</p>
+        )}
         {briefLoading ? (
           <div className="rounded-xl border border-border/60 bg-card p-6">
             <div className="flex items-center gap-3 text-muted-foreground">
@@ -535,6 +629,65 @@ function DashboardContent() {
           )}
         </div>
       </div>
+
+      {/* Upcoming this week */}
+      {!loading && Object.keys(upcomingFollowUps).length > 0 && (
+        <div className="mb-6">
+          <button
+            onClick={() => setUpcomingExpanded(!upcomingExpanded)}
+            className="flex w-full items-center justify-between rounded-xl border border-border/60 bg-card/50 px-4 py-3 text-left text-sm text-muted-foreground hover:bg-muted/30 hover:text-foreground transition-colors"
+            aria-expanded={upcomingExpanded}
+            aria-controls="upcoming-followups-content"
+          >
+            <span className="font-medium">
+              This week:{" "}
+              {Object.entries(upcomingFollowUps)
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([dateKey, arr]) => `${formatUpcomingDateKey(dateKey)} ${arr.length}`)
+                .join(" · ")}
+            </span>
+            {upcomingExpanded ? (
+              <ChevronUp className="h-4 w-4 shrink-0" />
+            ) : (
+              <ChevronDown className="h-4 w-4 shrink-0" />
+            )}
+          </button>
+          {upcomingExpanded && (
+            <div
+              id="upcoming-followups-content"
+              className="mt-2 space-y-2 rounded-xl border border-border/60 bg-card/30 p-4"
+            >
+              {Object.entries(upcomingFollowUps)
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([dateKey, arr]) => (
+                  <div key={dateKey} className="space-y-1.5">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      {formatUpcomingDateKey(dateKey)} — {arr.length} follow-up{arr.length !== 1 ? "s" : ""}
+                    </p>
+                    {arr.map((item) => (
+                      <Link
+                        key={item.prospectId}
+                        href={`/prospects/${item.prospectId}`}
+                        className="flex items-center justify-between gap-3 rounded-lg border border-border/40 bg-background/50 px-3 py-2 text-sm hover:bg-muted/30"
+                      >
+                        <span className="font-medium truncate">
+                          {item.prospectName}
+                          {item.company && (
+                            <span className="text-muted-foreground font-normal"> at {item.company}</span>
+                          )}
+                        </span>
+                        <span className="shrink-0 text-xs text-muted-foreground">
+                          {item.lastChannel || "—"}
+                          {item.lastOutcome && item.lastOutcome !== "no_response" && ` · ${item.lastOutcome}`}
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Batch action bar */}
       {hasSelection && (

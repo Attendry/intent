@@ -11,6 +11,10 @@ const include = {
   company: {
     select: { id: true, name: true },
   },
+  createdBy: { select: { id: true, email: true } },
+  shares: {
+    select: { shareType: true, sharedWithId: true, sharedBy: { select: { email: true } } },
+  },
 };
 
 export async function PATCH(

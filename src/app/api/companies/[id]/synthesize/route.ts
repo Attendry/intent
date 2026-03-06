@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { generateAccountSynthesis } from "@/lib/ai";
 import { requireAuth } from "@/lib/auth";
+import { requireCompanyAccess } from "@/lib/access";
 
 export async function POST(
   _request: NextRequest,
@@ -14,8 +15,13 @@ export async function POST(
     if ("error" in auth) return auth.error;
     const userId = auth.user.id;
 
+    const accessResult = await requireCompanyAccess(id, userId, {
+      allowCollaborator: true,
+    });
+    if ("error" in accessResult) return accessResult.error;
+
     const company = await prisma.company.findFirst({
-      where: { id, userId },
+      where: { id },
       include: {
         intel: { orderBy: { createdAt: "desc" } },
         documents: {

@@ -192,6 +192,20 @@ export const voiceExampleSchema = z.object({
   revisedDraft: z.string().min(1),
 });
 
+export const createScheduledPostSchema = z.object({
+  body: z.string().min(1),
+  scheduledAt: z.string().min(1), // ISO 8601 datetime string
+  firstComment: z.string().optional(),
+  seriesId: z.string().optional(),
+  notes: z.string().optional(),
+  timezone: z.string().optional(),
+});
+
+export const updateScheduledPostSchema = z.object({
+  status: z.enum(["posted", "cancelled"]).optional(),
+  prospectIds: z.array(z.string()).optional(),
+});
+
 export const suggestionActionSchema = z.object({
   action: z.enum(["approve", "dismiss"]),
 });

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   LayoutDashboard, Users, UserPlus, Building2, FileText,
   BarChart3, Settings, Sparkles, Briefcase, Target,
@@ -13,6 +13,19 @@ import {
 export default function Sidebar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [badges, setBadges] = useState<{ queueTotal: number; scheduledPostsDue: number }>({
+    queueTotal: 0,
+    scheduledPostsDue: 0,
+  });
+
+  useEffect(() => {
+    fetch("/api/reminders/summary")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d) setBadges({ queueTotal: d.queueTotal ?? 0, scheduledPostsDue: d.scheduledPostsDue ?? 0 });
+      })
+      .catch(() => {});
+  }, []);
 
   return (
     <>
@@ -55,7 +68,7 @@ export default function Sidebar() {
 
         <nav className="flex flex-1 flex-col gap-0.5 px-2.5 pt-2">
           {[
-            { href: "/", label: "Home", icon: LayoutDashboard },
+            { href: "/", label: "Home", icon: LayoutDashboard, badge: badges.queueTotal },
             { href: "/pipeline", label: "Pipeline", icon: Columns3 },
             { href: "/companies", label: "Companies", icon: Building2 },
             { href: "/prospects", label: "Prospects", icon: Users },
@@ -65,6 +78,7 @@ export default function Sidebar() {
               item.href === "/"
                 ? pathname === "/"
                 : pathname.startsWith(item.href);
+            const badge: number = "badge" in item ? ((item as { badge?: number }).badge ?? 0) : 0;
             return (
               <Link
                 key={item.href}
@@ -84,13 +98,18 @@ export default function Sidebar() {
                 <span className="overflow-hidden whitespace-nowrap md:opacity-0 md:transition-opacity md:duration-300 md:group-hover:opacity-100">
                   {item.label}
                 </span>
+                {badge > 0 && (
+                  <span className="ml-auto rounded-full bg-white/20 px-1.5 py-0.5 text-xs font-semibold" aria-live="polite">
+                    {badge > 99 ? "99+" : badge}
+                  </span>
+                )}
               </Link>
             );
           })}
           <div className="my-2 h-px bg-white/10" />
           {[
             { href: "/content", label: "Content", icon: FileText },
-            { href: "/social-posts", label: "Social Posts", icon: Share2 },
+            { href: "/social-posts", label: "Social Posts", icon: Share2, badge: badges.scheduledPostsDue },
             { href: "/findings", label: "Findings", icon: Bookmark },
             { href: "/fit-overview", label: "Fit Overview", icon: Target },
             { href: "/my-company", label: "My Company", icon: Briefcase },
@@ -100,6 +119,7 @@ export default function Sidebar() {
               item.href === "/"
                 ? pathname === "/"
                 : pathname.startsWith(item.href);
+            const badge: number = "badge" in item ? ((item as { badge?: number }).badge ?? 0) : 0;
             return (
               <Link
                 key={item.href}
@@ -119,6 +139,11 @@ export default function Sidebar() {
                 <span className="overflow-hidden whitespace-nowrap md:opacity-0 md:transition-opacity md:duration-300 md:group-hover:opacity-100">
                   {item.label}
                 </span>
+                {badge > 0 && (
+                  <span className="ml-auto rounded-full bg-white/20 px-1.5 py-0.5 text-xs font-semibold" aria-live="polite">
+                    {badge > 99 ? "99+" : badge}
+                  </span>
+                )}
               </Link>
             );
           })}
