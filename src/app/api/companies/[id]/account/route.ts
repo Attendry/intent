@@ -114,10 +114,8 @@ export async function GET(
       coverageSummary = {
         contacted: proactive.contactGap.contacted,
         total: proactive.contactGap.total,
-        personaGap: proactive.personaGap.missingPersonas.length > 0 ||
-          proactive.personaGap.knownButUncontacted.length > 0
-          ? proactive.personaGap
-          : undefined,
+        // Always include personaGap so UI can show status (gaps, all covered, or setup hint)
+        personaGap: proactive.personaGap,
       };
     } catch (err) {
       console.warn("Proactive coverage computation failed:", err);

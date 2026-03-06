@@ -72,6 +72,8 @@ export interface ProactiveCoverageResult {
     source: "profile" | "fit" | "ai" | "combined";
     /** Personas we have a prospect for but haven't contacted. */
     knownButUncontacted: Array<{ persona: string; prospectName: string; prospectId: string }>;
+    /** True if we had target personas from profile/fit/AI to compare against. */
+    hasTargetPersonas: boolean;
   };
 }
 
@@ -230,6 +232,7 @@ export async function computeProactiveCoverage(
       missingPersonas,
       source,
       knownButUncontacted,
+      hasTargetPersonas: allTargetPersonas.length > 0,
     },
   };
 }

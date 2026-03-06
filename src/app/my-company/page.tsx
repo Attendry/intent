@@ -419,11 +419,19 @@ export default function MyCompanyPage() {
             </CardContent>
           </Card>
 
+          {/* Target Personas - buying committee roles we sell to */}
+          <Card>
+            <CardHeader><CardTitle className="flex items-center gap-2"><Users className="h-4 w-4" /> Target Personas</CardTitle></CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-3">Job titles or roles that typically buy from you (e.g. CTO, VP Sales, CFO). Used for account coverage insights.</p>
+              <TagListEditor label="Roles" tags={editData.targetPersonas} onChange={(tags) => setEditData((d) => ({ ...d, targetPersonas: tags }))} />
+            </CardContent>
+          </Card>
+
           {/* Tags */}
           <Card>
             <CardHeader><CardTitle className="flex items-center gap-2"><Shield className="h-4 w-4" /> Differentiators & Pain Points</CardTitle></CardHeader>
             <CardContent className="flex flex-col gap-4">
-              <TagListEditor label="Target Personas" tags={editData.targetPersonas} onChange={(tags) => setEditData((d) => ({ ...d, targetPersonas: tags }))} />
               <TagListEditor label="Differentiators" tags={editData.differentiators} onChange={(tags) => setEditData((d) => ({ ...d, differentiators: tags }))} />
               <TagListEditor label="Pain Points Solved" tags={editData.painPointsSolved} onChange={(tags) => setEditData((d) => ({ ...d, painPointsSolved: tags }))} />
             </CardContent>
@@ -537,13 +545,29 @@ export default function MyCompanyPage() {
           </Card>
         )}
 
+        {/* Target Personas */}
+        <Card>
+          <CardHeader><CardTitle className="flex items-center gap-2"><Users className="h-4 w-4" /> Target Personas</CardTitle></CardHeader>
+          <CardContent>
+            {personas.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {personas.map((t) => <Badge key={t} variant="outline">{t}</Badge>)}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No target personas defined. Edit to add roles (e.g. CTO, VP Sales) for account coverage insights.</p>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Tags */}
         <Card>
-          <CardHeader><CardTitle className="flex items-center gap-2"><Shield className="h-4 w-4" /> Key Attributes</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="flex items-center gap-2"><Shield className="h-4 w-4" /> Differentiators & Pain Points</CardTitle></CardHeader>
           <CardContent className="flex flex-col gap-4">
-            {personas.length > 0 && <TagSection label="Target Personas" tags={personas} />}
             {differentiators.length > 0 && <TagSection label="Differentiators" tags={differentiators} />}
             {painPoints.length > 0 && <TagSection label="Pain Points Solved" tags={painPoints} />}
+            {differentiators.length === 0 && painPoints.length === 0 && (
+              <p className="text-sm text-muted-foreground">No differentiators or pain points defined yet.</p>
+            )}
           </CardContent>
         </Card>
 

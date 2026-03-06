@@ -7,7 +7,7 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    // Use DIRECT_URL for migrations (port 5432) - faster and more reliable than pooler (6543)
+    // Migrations need DIRECT_URL: use Session pooler (pooler:5432), not transaction pooler (6543) or true direct (IPv4/Vercel issues).
     url: process.env.DIRECT_URL ?? env("DATABASE_URL"),
   },
 });

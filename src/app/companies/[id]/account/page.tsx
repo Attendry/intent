@@ -70,6 +70,7 @@ interface AccountData {
       missingPersonas: string[];
       source: "profile" | "fit" | "ai" | "combined";
       knownButUncontacted: Array<{ persona: string; prospectName: string; prospectId: string }>;
+      hasTargetPersonas?: boolean;
     };
   } | null;
   findings: Array<{ id: string; content: string; createdAt: string }>;
@@ -324,7 +325,7 @@ export default function AccountPage() {
       </div>
 
       {/* Coverage gaps (collapsible) */}
-      {coverage && (coverage.total > 0 || (coverage.personaGap && (coverage.personaGap.missingPersonas.length > 0 || coverage.personaGap.knownButUncontacted.length > 0))) && (
+      {coverage && (coverage.total > 0 || coverage.personaGap) && (
         <div className="mb-6 rounded-xl border border-border">
           <button
             onClick={() => setCoverageCollapsed(!coverageCollapsed)}
@@ -384,39 +385,49 @@ export default function AccountPage() {
               </div>
 
               {/* Persona gap: roles we should have but don't */}
-              {coverage.personaGap &&
-                (coverage.personaGap.missingPersonas.length > 0 ||
-                  coverage.personaGap.knownButUncontacted.length > 0) && (
-                  <div>
-                    <h4 className="font-medium text-foreground mb-1">Persona gap</h4>
-                    <p className="text-muted-foreground mb-2">
-                      Key buying committee roles we should have for this account.
+              {coverage.personaGap && (
+                <div>
+                  <h4 className="font-medium text-foreground mb-1">Persona gap</h4>
+                  {!coverage.personaGap.hasTargetPersonas ? (
+                    <p className="text-muted-foreground">
+                      Set up target personas in <Link href="/my-company" className="text-primary hover:underline">My Company</Link> to see recommended buying committee roles for this account.
                     </p>
-                    {coverage.personaGap.missingPersonas.length > 0 && (
-                      <p className="text-muted-foreground">
-                        <span className="font-medium text-amber-600 dark:text-amber-400">Missing:</span>{" "}
-                        <span className="text-foreground">No contacts yet</span> —{" "}
-                        {coverage.personaGap.missingPersonas.join(", ")}
+                  ) : coverage.personaGap.missingPersonas.length > 0 || coverage.personaGap.knownButUncontacted.length > 0 ? (
+                    <>
+                      <p className="text-muted-foreground mb-2">
+                        Key buying committee roles we should have for this account.
                       </p>
-                    )}
-                    {coverage.personaGap.knownButUncontacted.length > 0 && (
-                      <p className="text-muted-foreground mt-1">
-                        <span className="font-medium text-amber-600 dark:text-amber-400">Known but uncontacted:</span>{" "}
-                        {coverage.personaGap.knownButUncontacted.map(({ persona, prospectName, prospectId }) => (
-                          <span key={prospectId}>
-                            <Link href={`/prospects/${prospectId}`} className="text-primary hover:underline">
-                              {prospectName}
-                            </Link>
-                            {" "}({persona}){" "}
-                          </span>
-                        ))}
+                      {coverage.personaGap.missingPersonas.length > 0 && (
+                        <p className="text-muted-foreground">
+                          <span className="font-medium text-amber-600 dark:text-amber-400">Missing:</span>{" "}
+                          <span className="text-foreground">No contacts yet</span> —{" "}
+                          {coverage.personaGap.missingPersonas.join(", ")}
+                        </p>
+                      )}
+                      {coverage.personaGap.knownButUncontacted.length > 0 && (
+                        <p className="text-muted-foreground mt-1">
+                          <span className="font-medium text-amber-600 dark:text-amber-400">Known but uncontacted:</span>{" "}
+                          {coverage.personaGap.knownButUncontacted.map(({ persona, prospectName, prospectId }) => (
+                            <span key={prospectId}>
+                              <Link href={`/prospects/${prospectId}`} className="text-primary hover:underline">
+                                {prospectName}
+                              </Link>
+                              {" "}({persona}){" "}
+                            </span>
+                          ))}
+                        </p>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Source: {coverage.personaGap.source === "combined" ? "profile + fit analysis + AI" : coverage.personaGap.source}
                       </p>
-                    )}
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Source: {coverage.personaGap.source === "combined" ? "profile + fit analysis + AI" : coverage.personaGap.source}
+                    </>
+                  ) : (
+                    <p className="text-muted-foreground">
+                      All key buying committee roles covered.
                     </p>
-                  </div>
-                )}
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

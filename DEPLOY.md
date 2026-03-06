@@ -8,7 +8,8 @@ Set these for **Production** (and Preview if using a separate DB):
 
 | Variable | Required | Notes |
 |----------|----------|-------|
-| `DATABASE_URL` | Yes | Supabase PostgreSQL connection string (Transaction pooler) |
+| `DATABASE_URL` | Yes | Supabase **transaction pooler** (port **6543**, `?pgbouncer=true`). Use pooler URL for runtime. See [Troubleshooting](#8-troubleshooting-maxclientsinsessionmode) below. |
+| `DIRECT_URL` | Yes | For migrations. Use **Session pooler** (port **5432** on `pooler.supabase.com`), not the true direct connection — the direct connection uses IPv6 (or IPv4 add-on) which Vercel may not support. Session pooler supports both IPv4 and IPv6. Get from Supabase → Connect → **Session** mode. Transaction pooler (6543) causes migrate to hang. |
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anon/public key |
 | `GEMINI_API_KEY` | Yes | For AI features. Redeploy after adding. |
@@ -94,3 +95,28 @@ npx vercel deploy --prod # Deploy with full build
 ```
 
 CLI deployments may use a different code path and can work when Git deployments fail.
+
+## 7. Troubleshooting: Migration Stuck / Build Hangs at Datasource
+
+If the build hangs at `Datasource "db": PostgreSQL database "postgres" at ...`:
+
+**Cause:** Prisma migrations need a connection that supports advisory locks. The transaction pooler (port 6543) does not, and causes migrate to hang. The true direct connection uses IPv6 (or IPv4 add-on) which Vercel may not support.
+
+**Fix:** Set `DIRECT_URL` to the **Session pooler** (port **5432** on the pooler host):
+- Supabase Dashboard → Connect → **Session** mode
+- Example: `postgresql://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:5432/postgres`
+- Same host as the transaction pooler (6543), different port — supports both IPv4 and IPv6, and works for migrations
+- Do **not** use the true direct connection (`db.[ref].supabase.co`) if Vercel reports IPv4 not supported
+
+## 8. Troubleshooting: MaxClientsInSessionMode
+
+If you see `MaxClientsInSessionMode: max clients reached` in Vercel logs:
+
+1. **Use the transaction pooler for `DATABASE_URL`** — In Supabase Dashboard → Project Settings → Database, use the **Connection pooling** URI (port **6543**), not the direct connection (5432). It must include `?pgbouncer=true`:
+   ```
+   postgresql://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres?pgbouncer=true
+   ```
+
+2. **Do not use the direct connection** for runtime — The direct URI (port 5432) uses session mode and exhausts connections in serverless. Use it only for `DIRECT_URL` (migrations).
+
+3. **Verify in Vercel** — Project Settings → Environment Variables. Ensure `DATABASE_URL` contains `pooler.supabase.com:6543` and `pgbouncer=true`.
