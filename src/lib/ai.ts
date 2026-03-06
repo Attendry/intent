@@ -1054,6 +1054,67 @@ ${prospectBlock}`;
   }
 }
 
+export interface InferBuyingCommitteeInput {
+  userId: string;
+  company: { name: string; industry: string | null; size: string | null };
+  targetPersonas: string[];
+  existingContacts: Array<{ name: string; title: string | null }>;
+}
+
+/**
+ * Infers key buying committee roles for a target account based on company context,
+ * seller's target personas, and typical B2B buying dynamics. Used to surface
+ * persona gaps (roles we should have but don't).
+ */
+export async function inferBuyingCommitteePersonas(
+  input: InferBuyingCommitteeInput
+): Promise<string[]> {
+  const system = `You are a B2B sales strategist. Given a target company and the seller's ideal buyer personas, infer the key roles that typically sit on the buying committee for this type of deal.
+
+Consider:
+- Company size and industry (e.g., enterprise vs SMB, tech vs manufacturing)
+- Standard B2B buying committee roles: Champion, Economic Buyer, Technical Buyer, User, Influencer, Blocker
+- Job titles that map to those roles (e.g., CTO, VP Engineering for technical; CFO, VP Finance for economic)
+- The seller's target personas as a baseline
+- Gaps: roles we likely need but don't yet have contacts for
+
+Output a JSON array of 3-8 persona strings (job titles or role descriptions), e.g.:
+["CTO", "VP Engineering", "VP Sales", "CFO"]
+Be specific and actionable. Focus on roles that would typically be involved in evaluating and approving this type of purchase.`;
+
+  const existingBlock =
+    input.existingContacts.length > 0
+      ? `Existing contacts: ${input.existingContacts.map((c) => `${c.name} (${c.title || "?"})`).join(", ")}`
+      : "No existing contacts.";
+
+  const prompt = `Target company: ${input.company.name}
+Industry: ${input.company.industry || "Unknown"}
+Size: ${input.company.size || "Unknown"}
+
+Seller's target personas: ${input.targetPersonas.join(", ") || "None specified"}
+
+${existingBlock}
+
+Return a JSON array of key buying committee roles we should have for this account.`;
+
+  try {
+    const text = await generate({
+      userId: input.userId,
+      system,
+      prompt,
+      json: true,
+      temperature: 0.3,
+    });
+    const parsed = JSON.parse(text);
+    const arr = Array.isArray(parsed) ? parsed : parsed.personas ?? parsed.roles ?? [];
+    return arr
+      .filter((x: unknown): x is string => typeof x === "string" && x.trim().length > 0)
+      .map((x: string) => x.trim());
+  } catch {
+    return [];
+  }
+}
+
 export interface CaptureEnrichmentResult {
   summary: string;
   firstName?: string;

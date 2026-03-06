@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 import { getCompanyAccess, requireCompanyAccess } from "@/lib/access";
+import { computeProactiveCoverage } from "@/lib/coverage";
 
 export async function GET(
   _request: NextRequest,
@@ -94,9 +95,37 @@ export async function GET(
 
     const contactedCount = prospectsWithAction.filter((p) => p.isContacted).length;
     const totalProspects = prospectsWithAction.length;
-    const coverageSummary = totalProspects > 0
-      ? { contacted: contactedCount, total: totalProspects, rolesContacted: contactedCount }
+
+    // Proactive coverage: contact gap + persona gap (profile + fit + AI inference)
+    let coverageSummary: {
+      contacted: number;
+      total: number;
+      personaGap?: {
+        missingPersonas: string[];
+        source: "profile" | "fit" | "ai" | "combined";
+        knownButUncontacted: Array<{ persona: string; prospectName: string; prospectId: string }>;
+      };
+    } | null = totalProspects > 0
+      ? { contacted: contactedCount, total: totalProspects }
       : null;
+
+    try {
+      const proactive = await computeProactiveCoverage(id, company.userId);
+      coverageSummary = {
+        contacted: proactive.contactGap.contacted,
+        total: proactive.contactGap.total,
+        personaGap: proactive.personaGap.missingPersonas.length > 0 ||
+          proactive.personaGap.knownButUncontacted.length > 0
+          ? proactive.personaGap
+          : undefined,
+      };
+    } catch (err) {
+      console.warn("Proactive coverage computation failed:", err);
+      // Fallback to basic coverage
+      if (coverageSummary && totalProspects > 0) {
+        coverageSummary = { contacted: contactedCount, total: totalProspects };
+      }
+    }
 
     const collaborators = await prisma.accountCollaborator.findMany({
       where: { companyId: id },

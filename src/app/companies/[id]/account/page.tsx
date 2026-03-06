@@ -63,7 +63,15 @@ interface AccountData {
     lastName: string;
     nextBestAction: string;
   }>;
-  coverage: { contacted: number; total: number } | null;
+  coverage: {
+    contacted: number;
+    total: number;
+    personaGap?: {
+      missingPersonas: string[];
+      source: "profile" | "fit" | "ai" | "combined";
+      knownButUncontacted: Array<{ persona: string; prospectName: string; prospectId: string }>;
+    };
+  } | null;
   findings: Array<{ id: string; content: string; createdAt: string }>;
 }
 
@@ -316,7 +324,7 @@ export default function AccountPage() {
       </div>
 
       {/* Coverage gaps (collapsible) */}
-      {coverage && coverage.total > 0 && (
+      {coverage && (coverage.total > 0 || (coverage.personaGap && (coverage.personaGap.missingPersonas.length > 0 || coverage.personaGap.knownButUncontacted.length > 0))) && (
         <div className="mb-6 rounded-xl border border-border">
           <button
             onClick={() => setCoverageCollapsed(!coverageCollapsed)}
@@ -331,28 +339,84 @@ export default function AccountPage() {
               <span className="font-medium">Coverage</span>
               <span className="text-sm text-muted-foreground">
                 {coverage.contacted} of {coverage.total} roles contacted
+                {coverage.personaGap &&
+                  (coverage.personaGap.missingPersonas.length > 0 ||
+                    coverage.personaGap.knownButUncontacted.length > 0) && (
+                    <span className="ml-2 text-amber-600 dark:text-amber-400">
+                      · {coverage.personaGap.missingPersonas.length + coverage.personaGap.knownButUncontacted.length} persona gap
+                      {coverage.personaGap.missingPersonas.length + coverage.personaGap.knownButUncontacted.length !== 1 ? "s" : ""}
+                    </span>
+                  )}
               </span>
             </div>
-            <div className="h-2 flex-1 max-w-[120px] mx-4 rounded-full bg-muted overflow-hidden">
-              <div
-                className="h-full bg-primary rounded-full transition-all"
-                style={{ width: `${(coverage.contacted / coverage.total) * 100}%` }}
-              />
-            </div>
+            {coverage.total > 0 && (
+              <div className="h-2 flex-1 max-w-[120px] mx-4 rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full bg-primary rounded-full transition-all"
+                  style={{ width: `${(coverage.contacted / coverage.total) * 100}%` }}
+                />
+              </div>
+            )}
           </button>
           {!coverageCollapsed && (
-            <div className="p-4 pt-0 text-sm text-muted-foreground">
-              {prospects.filter((p) => !p.isContacted).length > 0 ? (
-                <p>
-                  Uncontacted:{" "}
-                  {prospects
-                    .filter((p) => !p.isContacted)
-                    .map((p) => `${p.firstName} ${p.lastName} (${p.title || p.roleArchetype || "?"})`)
-                    .join(", ")}
-                </p>
-              ) : (
-                <p>All prospects have been contacted.</p>
-              )}
+            <div className="p-4 pt-0 space-y-4 text-sm">
+              {/* Contact gap: known but uncontacted */}
+              <div>
+                <h4 className="font-medium text-foreground mb-1">Contact gap</h4>
+                {prospects.filter((p) => !p.isContacted).length > 0 ? (
+                  <p className="text-muted-foreground">
+                    Uncontacted:{" "}
+                    {prospects
+                      .filter((p) => !p.isContacted)
+                      .map((p, i, arr) => (
+                        <span key={p.id}>
+                          <Link href={`/prospects/${p.id}`} className="text-primary hover:underline">
+                            {p.firstName} {p.lastName}
+                          </Link>
+                          <span className="text-muted-foreground"> ({p.title || p.roleArchetype || "?"})</span>
+                          {i < arr.length - 1 ? ", " : ""}
+                        </span>
+                      ))}
+                  </p>
+                ) : (
+                  <p className="text-muted-foreground">All known prospects have been contacted.</p>
+                )}
+              </div>
+
+              {/* Persona gap: roles we should have but don't */}
+              {coverage.personaGap &&
+                (coverage.personaGap.missingPersonas.length > 0 ||
+                  coverage.personaGap.knownButUncontacted.length > 0) && (
+                  <div>
+                    <h4 className="font-medium text-foreground mb-1">Persona gap</h4>
+                    <p className="text-muted-foreground mb-2">
+                      Key buying committee roles we should have for this account.
+                    </p>
+                    {coverage.personaGap.missingPersonas.length > 0 && (
+                      <p className="text-muted-foreground">
+                        <span className="font-medium text-amber-600 dark:text-amber-400">Missing:</span>{" "}
+                        <span className="text-foreground">No contacts yet</span> —{" "}
+                        {coverage.personaGap.missingPersonas.join(", ")}
+                      </p>
+                    )}
+                    {coverage.personaGap.knownButUncontacted.length > 0 && (
+                      <p className="text-muted-foreground mt-1">
+                        <span className="font-medium text-amber-600 dark:text-amber-400">Known but uncontacted:</span>{" "}
+                        {coverage.personaGap.knownButUncontacted.map(({ persona, prospectName, prospectId }) => (
+                          <span key={prospectId}>
+                            <Link href={`/prospects/${prospectId}`} className="text-primary hover:underline">
+                              {prospectName}
+                            </Link>
+                            {" "}({persona}){" "}
+                          </span>
+                        ))}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Source: {coverage.personaGap.source === "combined" ? "profile + fit analysis + AI" : coverage.personaGap.source}
+                    </p>
+                  </div>
+                )}
             </div>
           )}
         </div>
